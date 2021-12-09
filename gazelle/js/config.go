@@ -154,10 +154,10 @@ func (lang *JS) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 
 	data, err := ioutil.ReadFile(path.Join(c.RepoRoot, lang.Config.PackageFile))
 	if err != nil {
-		log.Fatalf("failed to open %s: %v", lang.Config.PackageFile, err)
+		log.Fatalf(Err("failed to open %s: %v", lang.Config.PackageFile, err))
 	}
 	if err := json.Unmarshal(data, &lang.Config.NpmDependencies); err != nil {
-		log.Fatalf("failed to parse %s: %v", lang.Config.PackageFile, err)
+		log.Fatalf(Err("failed to parse %s: %v", lang.Config.PackageFile, err))
 	}
 
 	keyPatterns := make([]string, 0, len(lang.Config.ImportAliases.aliases))

@@ -298,7 +298,7 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 	}
 
 	if module && len(tsSources) > 0 && len(jsSources) > 0 {
-		log.Printf("[WARN] ts and js files mixed in module %s", pkgName)
+		log.Print(Warn("[WARN] ts and js files mixed in module %s", pkgName))
 	}
 
 	aggregateModule := lang.Config.AggregateModules && module
@@ -543,11 +543,11 @@ func readFileAndParse(filePath string) *imports {
 
 	data, err := ioutil.ReadFile(filePath)
 	if err != nil {
-		log.Fatalf("Error reading %s: %v", filePath, err)
+		log.Fatalf(Err("Error reading %s: %v", filePath, err))
 	}
 	jsImports, err := ParseJS(data)
 	if err != nil {
-		log.Fatalf("Error parsing %s: %v", filePath, err)
+		log.Fatalf(Err("Error parsing %s: %v", filePath, err))
 	}
 	for _, imp := range jsImports {
 		fileImports.set[imp] = true
