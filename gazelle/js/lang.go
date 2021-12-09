@@ -167,7 +167,7 @@ func (lang *JS) Loads() []rule.LoadInfo {
 	// default
 	if len(loads) == 0 {
 		loads = []rule.LoadInfo{{
-			Name:    "@benchsci_bazel_rules_nodejs_contrib//:defs.bzl",
+			Name:    "@com_github_benchsci_rules_nodejs_gazelle//:defs.bzl",
 			Symbols: managedRules,
 		}}
 	}
