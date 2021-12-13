@@ -271,7 +271,8 @@ func (lang *JS) resolveWalkParents(name string, depSet map[string]bool, dataSet 
 		// don't look higher than web root for files
 		if localDir == lang.Config.WebRoot {
 			// unable to resolve import
-			log.Print(Err("[%s] import %v not found", from.Abs(from.Repo, from.Pkg).String(), target))
+			log.Print(Err("[%s] import %v not found", from.Abs(from.Repo, from.Pkg).String(), name))
+			log.Print(Warn("tried @npm//%s", name))
 			for _, try := range tries {
 				log.Print(Warn("tried %s", try))
 			}
