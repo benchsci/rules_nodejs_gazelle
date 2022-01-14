@@ -226,7 +226,7 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 
 	isWebRoot := path.Clean(lang.Config.WebRoot) == args.Rel
 
-	for _, baseName := range append(args.RegularFiles, args.GenFiles...) {
+	for _, baseName := range args.RegularFiles {
 		managedFiles[baseName] = true
 
 		filePath := path.Join(args.Dir, baseName)
