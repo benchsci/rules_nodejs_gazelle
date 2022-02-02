@@ -184,9 +184,11 @@ func (lang *JS) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Remote
 			}
 			depSet["@npm//"+name] = true
 
-			// does it have a corresponding @types/[...] declaration?
-			if lang.isNpmDependency("@types/" + name) {
-				depSet["@npm//@types/"+name] = true
+			if r.Kind() == "ts_project" {
+				// does it have a corresponding @types/[...] declaration?
+				if lang.isNpmDependency("@types/" + name) {
+					depSet["@npm//@types/"+name] = true
+				}
 			}
 
 			continue
