@@ -180,7 +180,9 @@ func (lang *JS) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 // interpret. Gazelle prints errors for directives that are not recoginized by
 // any Configurer.
 func (*JS) KnownDirectives() []string {
-	return []string{}
+	return []string{
+		"types",
+	}
 }
 
 // Configure modifies the configuration using directives and other information
@@ -196,6 +198,32 @@ func (*JS) KnownDirectives() []string {
 // existing build file.
 func (*JS) Configure(c *config.Config, rel string, f *rule.File) {
 
+	// Read directives from existing file
+	if f != nil {
+
+		// Read tsIncludeTypesSet from parent config
+		var tsIncludeTypesSet map[string]bool
+		if ifc, ok := c.Exts["ts-include-types-set"]; !ok {
+			// make new tsIncludeTypesSet
+			tsIncludeTypesSet = make(map[string]bool)
+		} else {
+			// use existing tsIncludeTypesSet
+			tsIncludeTypesSet = ifc.(map[string]bool)
+		}
+
+		for _, directive := range f.Directives {
+			// directive.Key = directive.Value
+			if directive.Key == "types" {
+				tsDefLabel := fmt.Sprintf("//%s:%s", rel, directive.Value)
+				tsIncludeTypesSet[tsDefLabel] = true
+			}
+		}
+
+		if len(tsIncludeTypesSet) > 0 {
+			c.Exts["ts-include-types-set"] = tsIncludeTypesSet
+		}
+
+	}
 }
 
 var tsDefsExtensions = []string{
