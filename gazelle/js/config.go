@@ -24,6 +24,7 @@ import (
 	"log"
 	"path"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/bazelbuild/bazel-gazelle/config"
@@ -201,28 +202,13 @@ func (*JS) Configure(c *config.Config, rel string, f *rule.File) {
 	// Read directives from existing file
 	if f != nil {
 
-		// Read tsIncludeTypesSet from parent config
-		var tsIncludeTypesSet map[string]bool
-		if ifc, ok := c.Exts["ts-include-types-set"]; !ok {
-			// make new tsIncludeTypesSet
-			tsIncludeTypesSet = make(map[string]bool)
-		} else {
-			// use existing tsIncludeTypesSet
-			tsIncludeTypesSet = ifc.(map[string]bool)
-		}
-
 		for _, directive := range f.Directives {
 			// directive.Key = directive.Value
-			if directive.Key == "types" {
-				tsDefLabel := fmt.Sprintf("//%s:%s", rel, directive.Value)
-				tsIncludeTypesSet[tsDefLabel] = true
+			if directive.Key == "ts-auto-types" {
+				val, _ := strconv.ParseBool(directive.Value)
+				c.Exts["ts-auto-types"] = val
 			}
 		}
-
-		if len(tsIncludeTypesSet) > 0 {
-			c.Exts["ts-include-types-set"] = tsIncludeTypesSet
-		}
-
 	}
 }
 
