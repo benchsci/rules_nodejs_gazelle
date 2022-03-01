@@ -184,8 +184,10 @@ func (lang *JS) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Remote
 			}
 			depSet["@npm//"+name] = true
 
-			ifc := c.Exts["ts-auto-types"]
-			autoTypes := ifc.(bool)
+			autoTypes := false
+			if ifc, ok := c.Exts["ts-auto-types"]; ok {
+				autoTypes = ifc.(bool)
+			}
 			if autoTypes && r.Kind() == "ts_project" {
 				// does it have a corresponding @types/[...] declaration?
 				if lang.isNpmDependency("@types/" + name) {
