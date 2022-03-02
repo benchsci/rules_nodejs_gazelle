@@ -37,7 +37,6 @@ import (
 // on JS, so this configuration may be relevant to them.
 type JsConfig struct {
 	PackageFile     string
-	LoadFrom        string
 	NpmDependencies struct {
 		Dependencies    map[string]string `json:"dependencies"`
 		DevDependencies map[string]string `json:"devDependencies"`
@@ -138,7 +137,6 @@ func (lang *JS) RegisterFlags(fs *flag.FlagSet, cmd string, c *config.Config) {
 	fs.BoolVar(&lang.Config.Fix, "fix", false, "Fix deprecated rules (same as \"gazelle fix\")")
 	fs.Var(&lang.Config.Ignores, "ignore", "ignore directories matching this regex")
 	fs.StringVar(&lang.Config.PackageFile, "package_file", "package.json", "path to the package.json used to resolve npm deps")
-	fs.StringVar(&lang.Config.LoadFrom, "load_from", "@benchsci_bazel_rules_nodejs_contrib//:defs.bzl", "the path to the bazel definitons to load the rules with")
 	fs.Var(&lang.Config.ImportAliases, "import_alias", "a key:value re-mapping an import path prefix")
 	fs.Var(&lang.Config.Visibility, "visibility", "a default visibility to add to each rule")
 	fs.StringVar(&lang.Config.WebRoot, "web_root", "./", "relative path to the web root of the modules")
@@ -201,7 +199,6 @@ func (*JS) Configure(c *config.Config, rel string, f *rule.File) {
 
 	// Read directives from existing file
 	if f != nil {
-
 		for _, directive := range f.Directives {
 			// directive.Key = directive.Value
 			if directive.Key == "ts-auto-types" {

@@ -20,9 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"os"
 	"path"
-	"regexp"
 	"strings"
 
 	"github.com/bazelbuild/bazel-gazelle/config"
@@ -148,31 +146,10 @@ func init() {
 // GenerateRules, now or in the past, should be loadable from one of these
 // files.
 func (lang *JS) Loads() []rule.LoadInfo {
-
-	loads := []rule.LoadInfo{}
-
-	// This need to be hacked in from os.Args because Loads() is called before Flags processing
-	loadFromPattern := regexp.MustCompile(`^-load_from=(.+)$`)
-	for _, arg := range os.Args {
-		match := loadFromPattern.FindStringSubmatch(arg)
-		if len(match) > 0 {
-			loads = append(loads, rule.LoadInfo{
-				Name:    string(match[1]),
-				Symbols: managedRules,
-			},
-			)
-		}
-	}
-
-	// default
-	if len(loads) == 0 {
-		loads = []rule.LoadInfo{{
-			Name:    "@com_github_benchsci_rules_nodejs_gazelle//:defs.bzl",
-			Symbols: managedRules,
-		}}
-	}
-
-	return loads
+	return []rule.LoadInfo{{
+		Name:    "@com_github_benchsci_rules_nodejs_gazelle//:defs.bzl",
+		Symbols: managedRules,
+	}}
 }
 
 // GenerateRules extracts build metadata from source files in a directory.
@@ -234,7 +211,7 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		// TS DEFINITIONS ".d.ts"
 		match := tsDefsExtensionsPattern.FindStringSubmatch(baseName)
 		if len(match) > 0 {
-			r := rule.NewRule("ts_definition", strings.TrimSuffix(baseName, match[0])+".d")
+			r := rule.NewRule(args.Config.KindMap["ts_definition"].KindName, strings.TrimSuffix(baseName, match[0])+".d")
 			r.SetAttr("srcs", []string{baseName})
 			r.SetAttr("visibility", lang.Config.Visibility.Labels)
 
@@ -247,7 +224,7 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		match = jsTestExtensionsPattern.FindStringSubmatch(baseName)
 		if len(match) > 0 {
 			i, r := lang.makeTestRule(testRuleArgs{
-				ruleType:  "jest_test",
+				ruleType:  args.Config.KindMap["jest_test"].KindName,
 				extension: match[0],
 				filePath:  filePath,
 				baseName:  baseName,
@@ -260,7 +237,7 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		match = tsTestExtensionsPattern.FindStringSubmatch(baseName)
 		if len(match) > 0 {
 			i, r := lang.makeTestRule(testRuleArgs{
-				ruleType:  "jest_test",
+				ruleType:  args.Config.KindMap["jest_test"].KindName,
 				extension: match[0],
 				filePath:  filePath,
 				baseName:  baseName,
@@ -322,7 +299,7 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 			// add as a module
 			i, r := lang.makeModuleRule(moduleRuleArgs{
 				ruleName: name,
-				ruleType: "ts_project",
+				ruleType: args.Config.KindMap["ts_project"].KindName,
 				srcs:     tsSources,
 				imports:  tsImports,
 			})
@@ -331,7 +308,7 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		} else {
 			// add as singletons
 			tsRules := lang.makeRules(ruleArgs{
-				ruleType: "ts_project",
+				ruleType: args.Config.KindMap["ts_project"].KindName,
 				srcs:     tsSources,
 				trimExt:  true,
 			})
@@ -348,7 +325,7 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 			// add as a module
 			i, r := lang.makeModuleRule(moduleRuleArgs{
 				ruleName: pkgName,
-				ruleType: "js_library",
+				ruleType: args.Config.KindMap["js_library"].KindName,
 				srcs:     jsSources,
 				imports:  jsImports,
 			})
@@ -357,7 +334,7 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		} else {
 			// add as singletons
 			jsRules := lang.makeRules(ruleArgs{
-				ruleType: "js_library",
+				ruleType: args.Config.KindMap["js_library"].KindName,
 				srcs:     jsSources,
 				trimExt:  true,
 			})
@@ -380,7 +357,7 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		if lang.Config.AggregateWebAssets {
 			// aggregate rule
 			name := "assets"
-			r := rule.NewRule("web_assets", name)
+			r := rule.NewRule(args.Config.KindMap["web_assets"].KindName, name)
 			r.SetAttr("srcs", webAssets)
 			r.SetAttr("visibility", lang.Config.Visibility.Labels)
 
@@ -394,7 +371,7 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		} else {
 			// add as singletons
 			rules := lang.makeRules(ruleArgs{
-				ruleType: "web_asset",
+				ruleType: args.Config.KindMap["web_asset"].KindName,
 				srcs:     webAssets,
 				trimExt:  false, //shadow the original file name
 			})
@@ -417,7 +394,7 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 			webRootDeps = append(webRootDeps, fqName)
 		}
 		name := "all_assets"
-		r := rule.NewRule("web_assets", name)
+		r := rule.NewRule(args.Config.KindMap["web_assets"].KindName, name)
 		r.SetAttr("srcs", webRootDeps)
 
 		generatedRules = append(generatedRules, r)
