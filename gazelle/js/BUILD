@@ -23,10 +23,11 @@ go_library(
         "config.go",
         "lang.go",
         "parse.go",
-        "resolve.go",
         "pkgname.go",
+        "resolve.go",
     ],
     importpath = "benchsci.com/gazelle/v2",
+    visibility = ["//visibility:public"],
     deps = [
         "@bazel_gazelle//config:go_default_library",
         "@bazel_gazelle//label:go_default_library",
@@ -36,7 +37,6 @@ go_library(
         "@bazel_gazelle//rule:go_default_library",
         "@com_github_bazelbuild_buildtools//build:go_default_library",
     ],
-    visibility = ["//visibility:public"],
 )
 
 go_test(
@@ -52,5 +52,19 @@ go_test(
         "@bazel_gazelle//label:go_default_library",
         "@bazel_gazelle//resolve:go_default_library",
         "@bazel_gazelle//testtools:go_default_library",
+    ],
+)
+
+go_test(
+    name = "gazelle_test",
+    srcs = ["js_test.go"],
+    data = [
+        "//:gazelle_bin",
+    ] + glob(["testdata/**"]),
+    deps = [
+        "@bazel_gazelle//testtools:go_default_library",
+        "@com_github_emirpasic_gods//lists/singlylinkedlist",
+        "@com_github_ghodss_yaml//:yaml",
+        "@io_bazel_rules_go//go/tools/bazel:go_default_library",
     ],
 )

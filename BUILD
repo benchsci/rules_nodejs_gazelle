@@ -30,3 +30,17 @@ gazelle_binary(
     ],
     visibility = ["//visibility:public"],
 )
+
+# Gazelle configuration options.
+# See https://github.com/bazelbuild/bazel-gazelle#running-gazelle-with-bazel
+# gazelle:exclude bazel-out
+
+gazelle(
+    name = "update_go_deps",
+    args = [
+        "-from_file=go.mod",
+        "-to_macro=gazelle/js/deps.bzl%gazelle_deps",
+        "-prune",
+    ],
+    command = "update-repos",
+)

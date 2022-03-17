@@ -1,0 +1,22 @@
+load("@com_github_benchsci_rules_nodejs_gazelle//:defs.bzl", "js_library", "ts_project", "web_asset")
+
+# gazelle:exclude test.yaml
+# gazelle:exclude WORKSPACE
+
+ts_project(
+    name = "a",
+    srcs = ["a.ts"],
+    visibility = [],
+)
+
+js_library(
+    name = "b",
+    srcs = ["b.js"],
+    visibility = [],
+)
+
+web_asset(
+    name = "package_json",
+    srcs = ["package.json"],
+    visibility = [],
+)
