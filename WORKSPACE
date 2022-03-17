@@ -13,7 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-workspace(name="com_github_benchsci_rules_nodejs_gazelle")
+workspace(name = "com_github_benchsci_rules_nodejs_gazelle")
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
@@ -36,7 +36,11 @@ http_archive(
 )
 
 load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
-load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
+load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies")
+load("//gazelle/js:deps.bzl", "gazelle_deps")
+
+# gazelle:repository_macro gazelle/js/deps.bzl%gazelle_deps
+gazelle_deps()
 
 go_rules_dependencies()
 

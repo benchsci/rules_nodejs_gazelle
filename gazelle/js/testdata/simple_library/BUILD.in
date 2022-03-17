@@ -1,0 +1,2 @@
+# gazelle:exclude test.yaml
+# gazelle:exclude WORKSPACE

@@ -211,7 +211,7 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		// TS DEFINITIONS ".d.ts"
 		match := tsDefsExtensionsPattern.FindStringSubmatch(baseName)
 		if len(match) > 0 {
-			r := rule.NewRule(args.Config.KindMap["ts_definition"].KindName, strings.TrimSuffix(baseName, match[0])+".d")
+			r := rule.NewRule(getKind(args.Config, "ts_definition"), strings.TrimSuffix(baseName, match[0])+".d")
 			r.SetAttr("srcs", []string{baseName})
 			r.SetAttr("visibility", lang.Config.Visibility.Labels)
 
@@ -224,7 +224,7 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		match = jsTestExtensionsPattern.FindStringSubmatch(baseName)
 		if len(match) > 0 {
 			i, r := lang.makeTestRule(testRuleArgs{
-				ruleType:  args.Config.KindMap["jest_test"].KindName,
+				ruleType:  getKind(args.Config, "jest_test"),
 				extension: match[0],
 				filePath:  filePath,
 				baseName:  baseName,
@@ -237,7 +237,7 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		match = tsTestExtensionsPattern.FindStringSubmatch(baseName)
 		if len(match) > 0 {
 			i, r := lang.makeTestRule(testRuleArgs{
-				ruleType:  args.Config.KindMap["jest_test"].KindName,
+				ruleType:  getKind(args.Config, "jest_test"),
 				extension: match[0],
 				filePath:  filePath,
 				baseName:  baseName,
@@ -299,7 +299,7 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 			// add as a module
 			i, r := lang.makeModuleRule(moduleRuleArgs{
 				ruleName: name,
-				ruleType: args.Config.KindMap["ts_project"].KindName,
+				ruleType: getKind(args.Config, "ts_project"),
 				srcs:     tsSources,
 				imports:  tsImports,
 			})
@@ -308,7 +308,7 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		} else {
 			// add as singletons
 			tsRules := lang.makeRules(ruleArgs{
-				ruleType: args.Config.KindMap["ts_project"].KindName,
+				ruleType: getKind(args.Config, "ts_project"),
 				srcs:     tsSources,
 				trimExt:  true,
 			})
@@ -325,7 +325,7 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 			// add as a module
 			i, r := lang.makeModuleRule(moduleRuleArgs{
 				ruleName: pkgName,
-				ruleType: args.Config.KindMap["js_library"].KindName,
+				ruleType: getKind(args.Config, "js_library"),
 				srcs:     jsSources,
 				imports:  jsImports,
 			})
@@ -334,7 +334,7 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		} else {
 			// add as singletons
 			jsRules := lang.makeRules(ruleArgs{
-				ruleType: args.Config.KindMap["js_library"].KindName,
+				ruleType: getKind(args.Config, "js_library"),
 				srcs:     jsSources,
 				trimExt:  true,
 			})
@@ -357,7 +357,7 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		if lang.Config.AggregateWebAssets {
 			// aggregate rule
 			name := "assets"
-			r := rule.NewRule(args.Config.KindMap["web_assets"].KindName, name)
+			r := rule.NewRule(getKind(args.Config, "web_assets"), name)
 			r.SetAttr("srcs", webAssets)
 			r.SetAttr("visibility", lang.Config.Visibility.Labels)
 
@@ -371,7 +371,7 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		} else {
 			// add as singletons
 			rules := lang.makeRules(ruleArgs{
-				ruleType: args.Config.KindMap["web_asset"].KindName,
+				ruleType: getKind(args.Config, "web_asset"),
 				srcs:     webAssets,
 				trimExt:  false, //shadow the original file name
 			})
@@ -394,7 +394,7 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 			webRootDeps = append(webRootDeps, fqName)
 		}
 		name := "all_assets"
-		r := rule.NewRule(args.Config.KindMap["web_assets"].KindName, name)
+		r := rule.NewRule(getKind(args.Config, "web_assets"), name)
 		r.SetAttr("srcs", webRootDeps)
 
 		generatedRules = append(generatedRules, r)
@@ -545,4 +545,13 @@ func aggregateImports(imps []imports) *imports {
 	}
 
 	return &aggregatedImports
+}
+
+func getKind(c *config.Config, kind_name string) string {
+	// Extract kind_name from KindMap
+	if kind, ok := c.KindMap[kind_name]; ok {
+		return kind.KindName
+
+	}
+	return kind_name
 }
