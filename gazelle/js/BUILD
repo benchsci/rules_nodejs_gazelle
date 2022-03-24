@@ -39,32 +39,132 @@ go_library(
     ],
 )
 
+TEST_DEPS = [ 
+    "@bazel_gazelle//label:go_default_library",
+    "@bazel_gazelle//resolve:go_default_library",
+    "@bazel_gazelle//testtools:go_default_library",
+    "@com_github_emirpasic_gods//lists/singlylinkedlist",
+    "@com_github_ghodss_yaml//:yaml",
+    "@io_bazel_rules_go//go/tools/bazel:go_default_library",
+]
+
 go_test(
-    name = "go_default_test",
+    name = "go_parse_test",
     srcs = [
         "parse_test.go",
+    ],
+    embed = [":go_default_library"],
+    importpath = "benchsci.com/gazelle/v2",
+    rundir = ".",
+    deps = TEST_DEPS,
+)
+
+go_test(
+    name = "go_pkgname_test",
+    srcs = [
         "pkgname_test.go",
     ],
     embed = [":go_default_library"],
     importpath = "benchsci.com/gazelle/v2",
     rundir = ".",
-    deps = [
-        "@bazel_gazelle//label:go_default_library",
-        "@bazel_gazelle//resolve:go_default_library",
-        "@bazel_gazelle//testtools:go_default_library",
-    ],
+    deps = TEST_DEPS,
 )
 
 go_test(
-    name = "gazelle_test",
+    name = "gazelle_aggregate_asset_modules",
     srcs = ["js_test.go"],
     data = [
         "//:gazelle_bin",
-    ] + glob(["testdata/**"]),
-    deps = [
-        "@bazel_gazelle//testtools:go_default_library",
-        "@com_github_emirpasic_gods//lists/singlylinkedlist",
-        "@com_github_ghodss_yaml//:yaml",
-        "@io_bazel_rules_go//go/tools/bazel:go_default_library",
-    ],
+    ] + glob(["testdata/aggregate_asset_modules/**"]),
+    deps = TEST_DEPS,
+)
+
+go_test(
+    name = "gazelle_aggregate_asset_singletons",
+    srcs = ["js_test.go"],
+    data = [
+        "//:gazelle_bin",
+    ] + glob(["testdata/aggregate_asset_singletons/**"]),
+    deps = TEST_DEPS,
+)
+
+go_test(
+    name = "gazelle_disabled",
+    srcs = ["js_test.go"],
+    data = [
+        "//:gazelle_bin",
+    ] + glob(["testdata/disabled/**"]),
+    deps = TEST_DEPS,
+)
+
+go_test(
+    name = "gazelle_fix",
+    srcs = ["js_test.go"],
+    data = [
+        "//:gazelle_bin",
+    ] + glob(["testdata/fix/**"]),
+    deps = TEST_DEPS,
+)
+
+go_test(
+    name = "gazelle_import_alias",
+    srcs = ["js_test.go"],
+    data = [
+        "//:gazelle_bin",
+    ] + glob(["testdata/import_alias/**"]),
+    deps = TEST_DEPS,
+)
+
+go_test(
+    name = "gazelle_lookup_types",
+    srcs = ["js_test.go"],
+    data = [
+        "//:gazelle_bin",
+    ] + glob(["testdata/lookup_types/**"]),
+    deps = TEST_DEPS,
+)
+
+go_test(
+    name = "gazelle_simple_library",
+    srcs = ["js_test.go"],
+    data = [
+        "//:gazelle_bin",
+    ] + glob(["testdata/simple_library/**"]),
+    deps = TEST_DEPS,
+)
+
+go_test(
+    name = "gazelle_simple_module",
+    srcs = ["js_test.go"],
+    data = [
+        "//:gazelle_bin",
+    ] + glob(["testdata/simple_module/**"]),
+    deps = TEST_DEPS,
+)
+
+go_test(
+    name = "gazelle_simple_npm_library",
+    srcs = ["js_test.go"],
+    data = [
+        "//:gazelle_bin",
+    ] + glob(["testdata/simple_npm_library/**"]),
+    deps = TEST_DEPS,
+)
+
+go_test(
+    name = "gazelle_visibility",
+    srcs = ["js_test.go"],
+    data = [
+        "//:gazelle_bin",
+    ] + glob(["testdata/visibility/**"]),
+    deps = TEST_DEPS,
+)
+
+go_test(
+    name = "gazelle_web_assets_module",
+    srcs = ["js_test.go"],
+    data = [
+        "//:gazelle_bin",
+    ] + glob(["testdata/web_assets_module/**"]),
+    deps = TEST_DEPS,
 )

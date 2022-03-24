@@ -1,0 +1,6 @@
+load("@com_github_benchsci_rules_nodejs_gazelle//:defs.bzl", "ts_project")
+
+ts_project(
+    name = "b",
+    srcs = ["b.ts"],
+)

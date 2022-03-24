@@ -19,7 +19,7 @@ load("@bazel_gazelle//:def.bzl", "DEFAULT_LANGUAGES", "gazelle", "gazelle_binary
 gazelle(
     name = "gazelle",
     gazelle = ":gazelle_bin",
-    prefix = "github.com/benchsci/bazel_rules_nodejs_contrib",
+    prefix = "github.com/benchsci/rules_nodejs_gazelle",
     visibility = ["//visibility:public"],
 )
 

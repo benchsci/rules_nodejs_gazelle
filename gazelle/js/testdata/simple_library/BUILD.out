@@ -1,22 +1,24 @@
-load("@com_github_benchsci_rules_nodejs_gazelle//:defs.bzl", "js_library", "ts_project", "web_asset")
+load("@com_github_benchsci_rules_nodejs_gazelle//:defs.bzl", "js_library", "ts_definition", "ts_project", "web_asset")
 
-# gazelle:exclude test.yaml
-# gazelle:exclude WORKSPACE
+# gazelle:js_root
+# gazelle:js_web_asset json
+
+ts_definition(
+    name = "a.d",
+    srcs = ["a.d.ts"],
+)
 
 ts_project(
     name = "a",
     srcs = ["a.ts"],
-    visibility = [],
 )
 
 js_library(
     name = "b",
     srcs = ["b.js"],
-    visibility = [],
 )
 
 web_asset(
     name = "package_json",
     srcs = ["package.json"],
-    visibility = [],
 )

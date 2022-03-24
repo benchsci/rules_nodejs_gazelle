@@ -1,0 +1,10 @@
+load("@com_github_benchsci_rules_nodejs_gazelle//:defs.bzl", "ts_project")
+
+# gazelle:js_root
+# gazelle:js_visibility //visibility:public
+
+ts_project(
+    name = "a",
+    srcs = ["a.ts"],
+    visibility = ["//visibility:public"],
+)

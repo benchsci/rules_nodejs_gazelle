@@ -1,0 +1,10 @@
+load("@com_github_benchsci_rules_nodejs_gazelle//:defs.bzl", "ts_project")
+
+# gazelle:js_root
+# gazelle:js_import_alias foo module
+
+ts_project(
+    name = "a",
+    srcs = ["a.ts"],
+    deps = ["//module:b"],
+)
