@@ -68,6 +68,8 @@ type JsConfig struct {
 	Fix                bool
 	JSRoot             string
 	WebAssetSuffixes   map[string]bool
+	Quiet              bool
+	Verbose            bool
 }
 
 func NewJsConfig() *JsConfig {
@@ -93,6 +95,8 @@ func NewJsConfig() *JsConfig {
 		Fix:                false,
 		JSRoot:             "/",
 		WebAssetSuffixes:   make(map[string]bool),
+		Quiet:              false,
+		Verbose:            false,
 	}
 }
 
@@ -125,6 +129,8 @@ func (parent *JsConfig) NewChild() *JsConfig {
 	for k, v := range parent.WebAssetSuffixes {
 		child.WebAssetSuffixes[k] = v
 	}
+	child.Quiet = parent.Quiet
+	child.Verbose = parent.Verbose
 
 	return child
 }
@@ -171,6 +177,8 @@ func (*JS) KnownDirectives() []string {
 		"js_aggregate_web_assets",
 		"js_aggregate_all_assets",
 		"js_web_asset",
+		"js_quiet",
+		"js_verbose",
 	}
 }
 
@@ -299,6 +307,18 @@ func (*JS) Configure(c *config.Config, rel string, f *rule.File) {
 				}
 				for _, suffix := range strings.Split(suffixes, ",") {
 					jsConfig.WebAssetSuffixes[suffix] = status
+				}
+
+			case "js_quiet":
+				jsConfig.Quiet = readBoolDirective(directive)
+				if jsConfig.Quiet {
+					jsConfig.Verbose = false
+				}
+
+			case "js_verbose":
+				jsConfig.Verbose = readBoolDirective(directive)
+				if jsConfig.Verbose {
+					jsConfig.Quiet = false
 				}
 			}
 		}
