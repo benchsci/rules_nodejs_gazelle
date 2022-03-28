@@ -20,7 +20,9 @@ go_library(
     name = "go_default_library",
     srcs = [
         "colors.go",
-        "config.go",
+        "configure.go",
+        "generate.go",
+        "kinds.go",
         "lang.go",
         "parse.go",
         "pkgname.go",
@@ -49,6 +51,17 @@ TEST_DEPS = [
 ]
 
 go_test(
+    name = "go_generate_test",
+    srcs = [
+        "generate_test.go",
+    ],
+    embed = [":go_default_library"],
+    importpath = "benchsci.com/gazelle/v2",
+    rundir = ".",
+    deps = TEST_DEPS,
+)
+
+go_test(
     name = "go_parse_test",
     srcs = [
         "parse_test.go",
@@ -72,7 +85,7 @@ go_test(
 
 go_test(
     name = "gazelle_aggregate_asset_modules",
-    srcs = ["js_test.go"],
+    srcs = ["gazelle_test.go"],
     data = [
         "//:gazelle_bin",
     ] + glob(["testdata/aggregate_asset_modules/**"]),
@@ -81,7 +94,7 @@ go_test(
 
 go_test(
     name = "gazelle_aggregate_asset_singletons",
-    srcs = ["js_test.go"],
+    srcs = ["gazelle_test.go"],
     data = [
         "//:gazelle_bin",
     ] + glob(["testdata/aggregate_asset_singletons/**"]),
@@ -90,7 +103,7 @@ go_test(
 
 go_test(
     name = "gazelle_disabled",
-    srcs = ["js_test.go"],
+    srcs = ["gazelle_test.go"],
     data = [
         "//:gazelle_bin",
     ] + glob(["testdata/disabled/**"]),
@@ -99,7 +112,7 @@ go_test(
 
 go_test(
     name = "gazelle_fix",
-    srcs = ["js_test.go"],
+    srcs = ["gazelle_test.go"],
     data = [
         "//:gazelle_bin",
     ] + glob(["testdata/fix/**"]),
@@ -108,7 +121,7 @@ go_test(
 
 go_test(
     name = "gazelle_import_alias",
-    srcs = ["js_test.go"],
+    srcs = ["gazelle_test.go"],
     data = [
         "//:gazelle_bin",
     ] + glob(["testdata/import_alias/**"]),
@@ -117,7 +130,7 @@ go_test(
 
 go_test(
     name = "gazelle_lookup_types",
-    srcs = ["js_test.go"],
+    srcs = ["gazelle_test.go"],
     data = [
         "//:gazelle_bin",
     ] + glob(["testdata/lookup_types/**"]),
@@ -126,7 +139,7 @@ go_test(
 
 go_test(
     name = "gazelle_simple_library",
-    srcs = ["js_test.go"],
+    srcs = ["gazelle_test.go"],
     data = [
         "//:gazelle_bin",
     ] + glob(["testdata/simple_library/**"]),
@@ -135,7 +148,7 @@ go_test(
 
 go_test(
     name = "gazelle_simple_module",
-    srcs = ["js_test.go"],
+    srcs = ["gazelle_test.go"],
     data = [
         "//:gazelle_bin",
     ] + glob(["testdata/simple_module/**"]),
@@ -144,7 +157,7 @@ go_test(
 
 go_test(
     name = "gazelle_simple_npm_library",
-    srcs = ["js_test.go"],
+    srcs = ["gazelle_test.go"],
     data = [
         "//:gazelle_bin",
     ] + glob(["testdata/simple_npm_library/**"]),
@@ -153,7 +166,7 @@ go_test(
 
 go_test(
     name = "gazelle_visibility",
-    srcs = ["js_test.go"],
+    srcs = ["gazelle_test.go"],
     data = [
         "//:gazelle_bin",
     ] + glob(["testdata/visibility/**"]),
@@ -162,7 +175,7 @@ go_test(
 
 go_test(
     name = "gazelle_web_assets_module",
-    srcs = ["js_test.go"],
+    srcs = ["gazelle_test.go"],
     data = [
         "//:gazelle_bin",
     ] + glob(["testdata/web_assets_module/**"]),
