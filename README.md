@@ -149,4 +149,20 @@ The following directives are recognized by this plugin:
     <td colspan="2"><p dir="auto">Files with a matching suffix will have <code>web_assets</code> rules created for them</p></td>
   </tr>
 
+  <tr>
+    <td><code># gazelle:js_quiet true|false</code></td>
+    <td><code>false</code></td>
+  </tr>
+  <tr>
+    <td colspan="2"><p dir="auto">Silence extension warnings about missing imports (overrides gazelle:js_verbose)</p></td>
+  </tr>
+
+  <tr>
+    <td><code># gazelle:js_verbose true|false</code></td>
+    <td><code>false</code></td>
+  </tr>
+  <tr>
+    <td colspan="2"><p dir="auto">Print more information about missing imports (overrides gazelle:js_quiet)</p></td>
+  </tr>
+
 </tbody>

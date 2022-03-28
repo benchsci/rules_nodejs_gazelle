@@ -280,10 +280,14 @@ func (lang *JS) resolveWalkParents(name string, depSet map[string]bool, dataSet 
 
 		if jsConfig.JSRoot == localDir || localDir == "." {
 			// unable to resolve import
-			log.Print(Err("[%s] import %v not found", from.Abs(from.Repo, from.Pkg).String(), name))
-			log.Print(Warn("tried @npm//%s", name))
-			for _, try := range tries {
-				log.Print(Warn("tried %s", try))
+			if !jsConfig.Quiet {
+				log.Print(Err("[%s] import %v not found", from.Abs(from.Repo, from.Pkg).String(), name))
+			}
+			if jsConfig.Verbose {
+				log.Print(Warn("tried @npm//%s", name))
+				for _, try := range tries {
+					log.Print(Warn("tried %s", try))
+				}
 			}
 			return
 		}
