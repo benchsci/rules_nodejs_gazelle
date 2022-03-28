@@ -1,0 +1,6 @@
+# gazelle:js_fix
+
+js_import(
+    name = "a",
+    srcs = ["a.ts"],
+)

@@ -1,0 +1,24 @@
+load("@com_github_benchsci_rules_nodejs_gazelle//:defs.bzl", "ts_project", "web_asset")
+
+# gazelle:js_root
+# gazelle:js_web_asset json
+# gazelle:js_package_file package.json
+
+ts_project(
+    name = "a",
+    srcs = ["a.ts"],
+    deps = [
+        ":b",
+        "@npm//lodash",
+    ],
+)
+
+ts_project(
+    name = "b",
+    srcs = ["b.ts"],
+)
+
+web_asset(
+    name = "package_json",
+    srcs = ["package.json"],
+)
