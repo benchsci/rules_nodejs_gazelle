@@ -37,12 +37,29 @@ var noImports = imports{
 	set: map[string]bool{},
 }
 
-var managedRules = []string{"js_library", "ts_project", "jest_test", "web_asset", "web_assets", "ts_definition"}
+var localRules = rule.LoadInfo{
+	Name:    "@com_github_benchsci_rules_nodejs_gazelle//:defs.bzl",
+	Symbols: []string{"web_asset", "web_assets", "js_library", "ts_definition"},
+}
+var tsRules = rule.LoadInfo{
+	Name:    "@npm//@bazel/typescript:index.bzl",
+	Symbols: []string{"ts_project"},
+}
+var jestRules = rule.LoadInfo{
+	Name:    "@npm//jest:index.bzl",
+	Symbols: []string{"jest_test"},
+}
 var managedRulesSet map[string]bool
 
 func init() {
 	managedRulesSet = make(map[string]bool)
-	for _, rule := range managedRules {
+	for _, rule := range localRules.Symbols {
+		managedRulesSet[rule] = true
+	}
+	for _, rule := range tsRules.Symbols {
+		managedRulesSet[rule] = true
+	}
+	for _, rule := range jestRules.Symbols {
 		managedRulesSet[rule] = true
 	}
 }
@@ -51,10 +68,11 @@ func init() {
 // GenerateRules, now or in the past, should be loadable from one of these
 // files.
 func (lang *JS) Loads() []rule.LoadInfo {
-	return []rule.LoadInfo{{
-		Name:    "@com_github_benchsci_rules_nodejs_gazelle//:defs.bzl",
-		Symbols: managedRules,
-	}}
+	return []rule.LoadInfo{
+		localRules,
+		tsRules,
+		jestRules,
+	}
 }
 
 // GenerateRules extracts build metadata from source files in a directory.

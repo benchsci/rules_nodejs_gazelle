@@ -22,14 +22,10 @@
 # #gazelle:map_kind js_library js_library @build_bazel_rules_nodejs
 # #gazelle:map_kind ts_project ts_project @my_local_repo
 
-load("@bazel_skylib//lib:sets.bzl", "sets")
 load("//internal:web_assets.bzl", _web_assets = "web_assets")
 load("@build_bazel_rules_nodejs//:index.bzl", _js_library = "js_library")
-load("@npm//jest:index.bzl", _jest_test = "jest_test")
-load("@npm//@bazel/typescript:index.bzl", _ts_project = "ts_project")
 
 js_library = _js_library
-jest_test = _jest_test
 ts_definition = _js_library
-ts_project = _ts_project
 web_assets = _web_assets
+web_asset = _web_assets

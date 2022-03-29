@@ -1,4 +1,4 @@
-load("@com_github_benchsci_rules_nodejs_gazelle//:defs.bzl", "ts_project")
+load("@npm//@bazel/typescript:index.bzl", "ts_project")
 
 # gazelle:js_root
 
