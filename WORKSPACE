@@ -37,9 +37,9 @@ http_archive(
 
 load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies")
-load("//gazelle/js:deps.bzl", "gazelle_deps")
+load("//gazelle:deps.bzl", "gazelle_deps")
 
-# gazelle:repository_macro gazelle/js/deps.bzl%gazelle_deps
+# gazelle:repository_macro gazelle/deps.bzl%gazelle_deps
 gazelle_deps()
 
 go_rules_dependencies()
