@@ -1,4 +1,5 @@
-load("@com_github_benchsci_rules_nodejs_gazelle//:defs.bzl", "ts_project", "web_asset")
+load("@com_github_benchsci_rules_nodejs_gazelle//:defs.bzl", "web_asset")
+load("@npm//@bazel/typescript:index.bzl", "ts_project")
 
 # gazelle:js_root
 # gazelle:js_web_asset json
