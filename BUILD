@@ -26,7 +26,7 @@ gazelle(
 gazelle_binary(
     name = "gazelle_bin",
     languages = DEFAULT_LANGUAGES + [
-        "//gazelle/js:go_default_library",
+        "//gazelle:gazelle",
     ],
     visibility = ["//visibility:public"],
 )
@@ -39,7 +39,7 @@ gazelle(
     name = "update_go_deps",
     args = [
         "-from_file=go.mod",
-        "-to_macro=gazelle/js/deps.bzl%gazelle_deps",
+        "-to_macro=gazelle:deps.bzl%gazelle_deps",
         "-prune",
     ],
     command = "update-repos",

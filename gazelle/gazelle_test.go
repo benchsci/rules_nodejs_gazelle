@@ -39,7 +39,7 @@ import (
 )
 
 const (
-	extensionDir      = "gazelle/js/"
+	extensionDir      = "gazelle/"
 	testDataPath      = extensionDir + "testdata/"
 	gazelleBinaryName = "gazelle_bin"
 )
