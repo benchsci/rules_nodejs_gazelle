@@ -1,0 +1,18 @@
+load("@npm//@bazel/typescript:index.bzl", "ts_project")
+
+ts_project(
+    name = "index",
+    srcs = ["index.ts"],
+    deps = [":my_module"],
+)
+
+ts_project(
+    name = "my_module",
+    srcs = ["my_module.ts"],
+)
+
+ts_project(
+    name = "some_other_file",
+    srcs = ["some_other_file.ts"],
+    deps = [":index"],
+)
