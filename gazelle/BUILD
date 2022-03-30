@@ -138,6 +138,15 @@ go_test(
 )
 
 go_test(
+    name = "gazelle_module_self_import",
+    srcs = ["gazelle_test.go"],
+    data = [
+        "//:gazelle_bin",
+    ] + glob(["testdata/module_self_import/**"]),
+    deps = TEST_DEPS,
+)
+
+go_test(
     name = "gazelle_simple_library",
     srcs = ["gazelle_test.go"],
     data = [

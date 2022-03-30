@@ -239,7 +239,7 @@ func (lang *JS) resolveWalkParents(name string, depSet map[string]bool, dataSet 
 			name = "package.json"
 		}
 		if name == "." {
-			name = path.Base(from.Pkg)
+			name = "index"
 		}
 
 		localDir := path.Join(from.Pkg, parents)
