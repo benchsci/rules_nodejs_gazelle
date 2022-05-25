@@ -32,7 +32,6 @@ func (*JS) Kinds() map[string]rule.KindInfo {
 			},
 			MergeableAttrs: map[string]bool{
 				"srcs": true,
-				"tags": true,
 			},
 			ResolveAttrs: map[string]bool{
 				"deps": true,
@@ -46,7 +45,6 @@ func (*JS) Kinds() map[string]rule.KindInfo {
 			},
 			MergeableAttrs: map[string]bool{
 				"srcs": true,
-				"tags": true,
 			},
 			ResolveAttrs: map[string]bool{
 				"deps": true,
@@ -60,7 +58,6 @@ func (*JS) Kinds() map[string]rule.KindInfo {
 			},
 			MergeableAttrs: map[string]bool{
 				"srcs": true,
-				"tags": true,
 			},
 			ResolveAttrs: map[string]bool{
 				"deps": true,
@@ -74,7 +71,6 @@ func (*JS) Kinds() map[string]rule.KindInfo {
 			},
 			MergeableAttrs: map[string]bool{
 				"srcs": true,
-				"tags": true,
 			},
 			ResolveAttrs: map[string]bool{
 				"deps": true,
@@ -88,7 +84,6 @@ func (*JS) Kinds() map[string]rule.KindInfo {
 			},
 			MergeableAttrs: map[string]bool{
 				"srcs": true,
-				"tags": true,
 			},
 		},
 		"web_assets": {
@@ -98,7 +93,6 @@ func (*JS) Kinds() map[string]rule.KindInfo {
 			},
 			MergeableAttrs: map[string]bool{
 				"srcs": true,
-				"tags": true,
 			},
 		},
 	}
