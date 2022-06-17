@@ -430,6 +430,8 @@ func (lang *JS) makeRules(args ruleArgs, jsConfig *JsConfig) []*rule.Rule {
 			name = trimExt(src)
 		} else {
 			name = strings.ReplaceAll(src, ".", "_")
+			name = strings.ReplaceAll(name, "[", "")
+			name = strings.ReplaceAll(name, "]", "")
 			if name == src {
 				name += ".file"
 			}
