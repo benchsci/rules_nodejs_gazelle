@@ -129,6 +129,15 @@ go_test(
 )
 
 go_test(
+    name = "gazelle_jest_mock",
+    srcs = ["gazelle_test.go"],
+    data = [
+        "//:gazelle_bin",
+    ] + glob(["testdata/jest_mock/**"]),
+    deps = TEST_DEPS,
+)
+
+go_test(
     name = "gazelle_lookup_types",
     srcs = ["gazelle_test.go"],
     data = [

@@ -52,6 +52,13 @@ func ParseJS(data []byte) ([]string, error) {
 			}
 			imports = append(imports, strings.ToLower(unquoted))
 
+		case match[JEST_MOCK] != nil:
+			unquoted, err := unquoteImportString(match[JEST_MOCK])
+			if err != nil {
+				return nil, fmt.Errorf("unquoting string literal %s from js, %v", match[JEST_MOCK], err)
+			}
+			imports = append(imports, strings.ToLower(unquoted))
+
 		default:
 			// Comment matched. Nothing to extract.
 		}
@@ -89,9 +96,10 @@ func unquoteImportString(quoted []byte) (string, error) {
 }
 
 const (
-	IMPORT  = 1
-	REQUIRE = 2
-	EXPORT  = 3
+	IMPORT    = 1
+	REQUIRE   = 2
+	EXPORT    = 3
+	JEST_MOCK = 4
 )
 
 var jsImportPattern = compileJsImportPattern()
@@ -102,5 +110,6 @@ func compileJsImportPattern() *regexp.Regexp {
 	importPattern := `(?m)^import\s(?:(?:.|\n)+?from )??(?P<import>` + stringLiteralPattern + `).*?`
 	requirePattern := `(?m)^\s*?(?:const .+ = )?require\((?P<require>` + stringLiteralPattern + `)\).*`
 	exportPattern := `(?m)^export\s(?:(?:.|\n)+?from )??(?P<export>` + stringLiteralPattern + `).*?`
-	return regexp.MustCompile(strings.Join([]string{importPattern, requirePattern, exportPattern}, "|"))
+	jestMockPattern := `(?m)^\s*?(?:const .+ = )?jest.mock\((?P<jestMock>` + stringLiteralPattern + `),.*`
+	return regexp.MustCompile(strings.Join([]string{importPattern, requirePattern, exportPattern, jestMockPattern}, "|"))
 }
