@@ -326,12 +326,19 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 	// Generate a list of rules that may be deleted
 	// This is generated from existing rules that are managed by gazelle
 	// that didn't get generated this run
-	deleteRulesSet := existingRules // no need to copy
 
+	// Populate set with existing rules
+	deleteRulesSet := make(map[string]*rule.Rule)
+	for _, existingRule := range existingRules {
+		// use kind/name to enable deletion of old rules when a new rule would use the same name
+		key := fmt.Sprintf("%s/%s", existingRule.Kind(), existingRule.Name())
+		deleteRulesSet[key] = existingRule
+	}
+
+	// Prune generated rules
 	for _, generatedRule := range generatedRules {
-		name := generatedRule.Name()
-		// This is not an empty rule
-		delete(deleteRulesSet, name)
+		key := fmt.Sprintf("%s/%s", generatedRule.Kind(), generatedRule.Name())
+		delete(deleteRulesSet, key)
 	}
 
 	for _, r := range deleteRulesSet {
