@@ -138,6 +138,15 @@ go_test(
 )
 
 go_test(
+    name = "gazelle_jsx_conversion",
+    srcs = ["gazelle_test.go"],
+    data = [
+        "//:gazelle_bin",
+    ] + glob(["testdata/jsx_conversion/**"]),
+    deps = TEST_DEPS,
+)
+
+go_test(
     name = "gazelle_lookup_types",
     srcs = ["gazelle_test.go"],
     data = [
@@ -179,6 +188,15 @@ go_test(
     data = [
         "//:gazelle_bin",
     ] + glob(["testdata/simple_npm_library/**"]),
+    deps = TEST_DEPS,
+)
+
+go_test(
+    name = "gazelle_ts_conversion",
+    srcs = ["gazelle_test.go"],
+    data = [
+        "//:gazelle_bin",
+    ] + glob(["testdata/ts_conversion/**"]),
     deps = TEST_DEPS,
 )
 
