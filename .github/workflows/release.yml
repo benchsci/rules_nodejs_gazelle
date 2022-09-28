@@ -24,7 +24,7 @@ jobs:
                   restore-keys: bazel-cache-
             - name: bazel test //...
               env:
-                  # Bazelisk will download bazel to here
+                  # Bazel will download bazel to here
                   XDG_CACHE_HOME: ~/.cache/bazel-repo
               run: bazel test //...
             - name: Prepare workspace snippet

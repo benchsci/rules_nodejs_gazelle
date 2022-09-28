@@ -178,12 +178,12 @@ func (lang *JS) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Remote
 			if strings.HasPrefix(name, "@") {
 				name += "/" + s[1]
 			}
-			depSet["@npm//"+name] = true
+			depSet[jsConfig.NpmLabel+name] = true
 
 			if jsConfig.LookupTypes && r.Kind() == "ts_project" {
 				// does it have a corresponding @types/[...] declaration?
 				if lang.isNpmDependency("@types/"+name, jsConfig) {
-					depSet["@npm//@types/"+name] = true
+					depSet[jsConfig.NpmLabel+"@types/"+name] = true
 				}
 			}
 

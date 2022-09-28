@@ -41,7 +41,7 @@ go_library(
     ],
 )
 
-TEST_DEPS = [ 
+TEST_DEPS = [
     "@bazel_gazelle//label:go_default_library",
     "@bazel_gazelle//resolve:go_default_library",
     "@bazel_gazelle//testtools:go_default_library",
@@ -83,137 +83,31 @@ go_test(
     deps = TEST_DEPS,
 )
 
-go_test(
-    name = "gazelle_aggregate_asset_modules",
-    srcs = ["gazelle_test.go"],
-    data = [
-        "//:gazelle_bin",
-    ] + glob(["testdata/aggregate_asset_modules/**"]),
-    deps = TEST_DEPS,
-)
-
-go_test(
-    name = "gazelle_aggregate_asset_singletons",
-    srcs = ["gazelle_test.go"],
-    data = [
-        "//:gazelle_bin",
-    ] + glob(["testdata/aggregate_asset_singletons/**"]),
-    deps = TEST_DEPS,
-)
-
-go_test(
-    name = "gazelle_disabled",
-    srcs = ["gazelle_test.go"],
-    data = [
-        "//:gazelle_bin",
-    ] + glob(["testdata/disabled/**"]),
-    deps = TEST_DEPS,
-)
-
-go_test(
-    name = "gazelle_fix",
-    srcs = ["gazelle_test.go"],
-    data = [
-        "//:gazelle_bin",
-    ] + glob(["testdata/fix/**"]),
-    deps = TEST_DEPS,
-)
-
-go_test(
-    name = "gazelle_import_alias",
-    srcs = ["gazelle_test.go"],
-    data = [
-        "//:gazelle_bin",
-    ] + glob(["testdata/import_alias/**"]),
-    deps = TEST_DEPS,
-)
-
-go_test(
-    name = "gazelle_jest_mock",
-    srcs = ["gazelle_test.go"],
-    data = [
-        "//:gazelle_bin",
-    ] + glob(["testdata/jest_mock/**"]),
-    deps = TEST_DEPS,
-)
-
-go_test(
-    name = "gazelle_jsx_conversion",
-    srcs = ["gazelle_test.go"],
-    data = [
-        "//:gazelle_bin",
-    ] + glob(["testdata/jsx_conversion/**"]),
-    deps = TEST_DEPS,
-)
-
-go_test(
-    name = "gazelle_lookup_types",
-    srcs = ["gazelle_test.go"],
-    data = [
-        "//:gazelle_bin",
-    ] + glob(["testdata/lookup_types/**"]),
-    deps = TEST_DEPS,
-)
-
-go_test(
-    name = "gazelle_module_self_import",
-    srcs = ["gazelle_test.go"],
-    data = [
-        "//:gazelle_bin",
-    ] + glob(["testdata/module_self_import/**"]),
-    deps = TEST_DEPS,
-)
-
-go_test(
-    name = "gazelle_simple_library",
-    srcs = ["gazelle_test.go"],
-    data = [
-        "//:gazelle_bin",
-    ] + glob(["testdata/simple_library/**"]),
-    deps = TEST_DEPS,
-)
-
-go_test(
-    name = "gazelle_simple_module",
-    srcs = ["gazelle_test.go"],
-    data = [
-        "//:gazelle_bin",
-    ] + glob(["testdata/simple_module/**"]),
-    deps = TEST_DEPS,
-)
-
-go_test(
-    name = "gazelle_simple_npm_library",
-    srcs = ["gazelle_test.go"],
-    data = [
-        "//:gazelle_bin",
-    ] + glob(["testdata/simple_npm_library/**"]),
-    deps = TEST_DEPS,
-)
-
-go_test(
-    name = "gazelle_ts_conversion",
-    srcs = ["gazelle_test.go"],
-    data = [
-        "//:gazelle_bin",
-    ] + glob(["testdata/ts_conversion/**"]),
-    deps = TEST_DEPS,
-)
-
-go_test(
-    name = "gazelle_visibility",
-    srcs = ["gazelle_test.go"],
-    data = [
-        "//:gazelle_bin",
-    ] + glob(["testdata/visibility/**"]),
-    deps = TEST_DEPS,
-)
-
-go_test(
-    name = "gazelle_web_assets_module",
-    srcs = ["gazelle_test.go"],
-    data = [
-        "//:gazelle_bin",
-    ] + glob(["testdata/web_assets_module/**"]),
-    deps = TEST_DEPS,
-)
+[
+    go_test(
+        name = "gazelle_{}".format(t),
+        srcs = ["gazelle_test.go"],
+        data = [
+            "//:gazelle_bin",
+        ] + glob(["testdata/{}/**".format(t)]),
+        deps = TEST_DEPS,
+    )
+    for t in [
+        "fix",
+        "aggregate_asset_modules",
+        "disabled",
+        "aggregate_asset_singletons",
+        "web_assets_module",
+        "npm_label",
+        "visibility",
+        "ts_conversion",
+        "simple_module",
+        "simple_npm_library",
+        "simple_library",
+        "module_self_import",
+        "lookup_types",
+        "jsx_conversion",
+        "jest_mock",
+        "import_alias",
+    ]
+]

@@ -103,6 +103,15 @@ The following directives are recognized by this plugin:
   </tr>
 
   <tr>
+    <td><code># gazelle:npm_label</code></td>
+    <td><code>@npm//</code></td>
+  </tr>
+  <tr>
+    <td colspan="2"><p dir="auto">Defines the label prefix for third npm dependencies e.g @npm// OR //:node_modules/ </p></td>
+  </tr>
+
+
+  <tr>
     <td><code># gazelle:js_lookup_types true|false</code></td>
     <td><code>false</code></td>
   </tr>
