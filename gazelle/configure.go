@@ -70,6 +70,7 @@ type JsConfig struct {
 	WebAssetSuffixes   map[string]bool
 	Quiet              bool
 	Verbose            bool
+	NpmLabel           string
 }
 
 func NewJsConfig() *JsConfig {
@@ -97,6 +98,7 @@ func NewJsConfig() *JsConfig {
 		WebAssetSuffixes:   make(map[string]bool),
 		Quiet:              false,
 		Verbose:            false,
+		NpmLabel:           "@npm//",
 	}
 }
 
@@ -131,6 +133,7 @@ func (parent *JsConfig) NewChild() *JsConfig {
 	}
 	child.Quiet = parent.Quiet
 	child.Verbose = parent.Verbose
+	child.NpmLabel = parent.NpmLabel
 
 	return child
 }
@@ -179,6 +182,7 @@ func (*JS) KnownDirectives() []string {
 		"js_web_asset",
 		"js_quiet",
 		"js_verbose",
+		"npm_label",
 	}
 }
 
@@ -275,6 +279,8 @@ func (*JS) Configure(c *config.Config, rel string, f *rule.File) {
 
 			case "js_visibility":
 				jsConfig.Visibility.Set(directive.Value)
+			case "npm_label":
+				jsConfig.NpmLabel = directive.Value
 
 			case "js_root":
 				jSRoot, err := filepath.Rel(".", f.Pkg)
