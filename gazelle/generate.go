@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -182,6 +183,25 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		// TS
 		match = tsExtensionsPattern.FindStringSubmatch(baseName)
 		if len(match) > 0 {
+			if baseName == "_app.tsx" || baseName == "_app.jsx" {
+				err := filepath.Walk(args.Dir,
+					func(path string, info os.FileInfo, err error) error {
+						if err != nil {
+							return err
+
+						}
+						if !info.IsDir() {
+
+							fmt.Println(path, info.Size())
+						}
+						return nil
+
+					})
+				if err != nil {
+					log.Println(err)
+
+				}
+			}
 			tsSources = append(tsSources, baseName)
 			tsImports = append(tsImports, *readFileAndParse(filePath))
 			continue

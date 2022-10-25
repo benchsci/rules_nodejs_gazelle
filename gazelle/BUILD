@@ -109,5 +109,6 @@ go_test(
         "jsx_conversion",
         "jest_mock",
         "import_alias",
+        "next_app",
     ]
 ]

@@ -76,6 +76,7 @@ type JsConfig struct {
 func NewJsConfig() *JsConfig {
 	return &JsConfig{
 		Enabled:     true,
+		LookupTypes: true,
 		PackageFile: "package.json",
 		NpmDependencies: struct {
 			Dependencies    map[string]string "json:\"dependencies\""
@@ -134,6 +135,7 @@ func (parent *JsConfig) NewChild() *JsConfig {
 	child.Quiet = parent.Quiet
 	child.Verbose = parent.Verbose
 	child.NpmLabel = parent.NpmLabel
+	child.LookupTypes = parent.LookupTypes
 
 	return child
 }
