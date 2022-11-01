@@ -196,6 +196,15 @@ func (lang *JS) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Remote
 			continue
 		}
 
+		// Is user resoleved
+		resolveResult := lang.tryResolve(name, c, ix, from)
+		if resolveResult.err == nil && !resolveResult.selfImport && resolveResult.label != label.NoLabel {
+			// add discovered label
+			lbl := resolveResult.label
+			dep := lbl.Rel(from.Repo, from.Pkg).String()
+			depSet[dep] = true
+			continue
+		}
 		// fix aliases
 		match := jsConfig.ImportAliasPattern.FindStringSubmatch(name)
 		if len(match) > 0 {
@@ -354,6 +363,23 @@ func (lang *JS) tryResolve(target string, c *config.Config, ix *resolve.RuleInde
 	importSpec := resolve.ImportSpec{
 		Lang: lang.Name(),
 		Imp:  strings.ToLower(target),
+	}
+	if override, ok := resolve.FindRuleWithOverride(c, importSpec, lang.Name()); ok {
+		if override.Repo == "" {
+			override.Repo = from.Repo
+		}
+		if !override.Equal(from) {
+			if override.Repo == from.Repo {
+				override.Repo = ""
+			}
+			return resolveResult{
+				label:      override,
+				selfImport: false,
+				fileName:   "",
+				err:        nil,
+			}
+
+		}
 	}
 
 	matches := ix.FindRulesByImportWithConfig(c, importSpec, lang.Name())
