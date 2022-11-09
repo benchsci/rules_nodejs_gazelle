@@ -131,6 +131,13 @@ if (process.ENV.SHOULD_IMPORT) {
 `,
 			want: []string{"mapbox.js"},
 		},
+		{
+			desc: "dynamic import",
+			name: "dynamic_import.js",
+			js: ` () => import('dynamic_module.js');
+			const foo = import('dynamic_module2.js')`,
+			want: []string{"dynamic_module.js", "dynamic_module2.js"},
+		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 
