@@ -147,21 +147,8 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 			continue
 		}
 
-		// JS TEST
-		match = jsTestExtensionsPattern.FindStringSubmatch(baseName)
-		if len(match) > 0 {
-			i, r := lang.makeTestRule(testRuleArgs{
-				ruleType:  getKind(args.Config, "jest_test"),
-				extension: match[0],
-				filePath:  filePath,
-				baseName:  baseName,
-			}, jsConfig)
-			generatedRules = append(generatedRules, r)
-			generatedImports = append(generatedImports, i)
-			continue
-		}
-		// TS TEST
-		match = tsTestExtensionsPattern.FindStringSubmatch(baseName)
+		// TS & JS TEST
+		match = append(jsTestExtensionsPattern.FindStringSubmatch(baseName), tsTestExtensionsPattern.FindStringSubmatch(baseName)...)
 		if len(match) > 0 {
 			i, r := lang.makeTestRule(testRuleArgs{
 				ruleType:  getKind(args.Config, "jest_test"),
@@ -210,73 +197,47 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 	aggregateModule := jsConfig.AggregateModules && isModule && !isJSRoot
 
 	// add "ts_project" rule(s)
-	if len(tsSources) > 0 {
-		name := pkgName
-		if len(jsSources) > 0 {
-			name = name + ".ts"
-		}
-		if aggregateModule {
-			// add as a module
-			moduleImports, moduleRules := lang.makeModuleRules(moduleRuleArgs{
-				pkgName:  name,
-				cwd:      args.Rel,
-				ruleType: getKind(args.Config, "ts_project"),
-				srcs:     tsSources,
-				imports:  tsImports,
-			}, jsConfig)
-			if !jsConfig.Quiet && len(moduleRules) > 1 {
-				log.Print(Warn("[WARN] disjoint module %s", args.Rel))
+	genRules := func(kindSources []string, kindImports []imports, appendTS bool, kind string) {
+		if len(kindSources) > 0 {
+			name := pkgName
+			if appendTS {
+				name = name + ".ts"
 			}
-			for i := range moduleRules {
-				generatedRules = append(generatedRules, moduleRules[i])
-				generatedImports = append(generatedImports, moduleImports[i])
-			}
-		} else {
-			// add as singletons
-			tsRules := lang.makeRules(ruleArgs{
-				ruleType: getKind(args.Config, "ts_project"),
-				srcs:     tsSources,
-				trimExt:  true,
-			}, jsConfig)
-			for i := range tsRules {
-				generatedRules = append(generatedRules, tsRules[i])
-				generatedImports = append(generatedImports, &tsImports[i])
+			if aggregateModule {
+				// add as a module
+				moduleImports, moduleRules := lang.makeModuleRules(moduleRuleArgs{
+					pkgName:  name,
+					cwd:      args.Rel,
+					ruleType: getKind(args.Config, kind),
+					srcs:     kindSources,
+					imports:  kindImports,
+				}, jsConfig)
+				if !jsConfig.Quiet && len(moduleRules) > 1 {
+					log.Print(Warn("[WARN] disjoint module %s", args.Rel))
+				}
+				for i := range moduleRules {
+					generatedRules = append(generatedRules, moduleRules[i])
+					generatedImports = append(generatedImports, moduleImports[i])
+				}
+			} else {
+				// add as singletons
+				singletonRules := lang.makeRules(ruleArgs{
+					ruleType: getKind(args.Config, kind),
+					srcs:     kindSources,
+					trimExt:  true,
+				}, jsConfig)
+				for i := range singletonRules {
+					generatedRules = append(generatedRules, singletonRules[i])
+					generatedImports = append(generatedImports, &kindImports[i])
+				}
 			}
 		}
 	}
 
-	// add "js_library" rule(s)
-	if len(jsSources) > 0 {
-		if aggregateModule {
-			// add as a module
-			moduleImports, moduleRules := lang.makeModuleRules(moduleRuleArgs{
-				pkgName:  pkgName,
-				cwd:      args.Rel,
-				ruleType: getKind(args.Config, "js_library"),
-				srcs:     tsSources,
-				imports:  tsImports,
-			}, jsConfig)
-			if !jsConfig.Quiet && len(moduleRules) > 1 {
-				log.Print(Warn("[WARN] disjoint module %s", args.Rel))
-			}
-			for i := range moduleRules {
-				generatedRules = append(generatedRules, moduleRules[i])
-				generatedImports = append(generatedImports, moduleImports[i])
-			}
-		} else {
-			// add as singletons
-			jsRules := lang.makeRules(ruleArgs{
-				ruleType: getKind(args.Config, "js_library"),
-				srcs:     jsSources,
-				trimExt:  true,
-			}, jsConfig)
-
-			for i := range jsRules {
-				generatedRules = append(generatedRules, jsRules[i])
-				generatedImports = append(generatedImports, &jsImports[i])
-			}
-		}
-	}
+	// add ts_project rules
+	genRules(tsSources, tsImports, len(jsSources) > 0, "ts_project")
+	// add js_library rules
+	genRules(jsSources, jsImports, false, "js_library")
 
 	// read webAssetsSet to list
 	webAssets := make([]string, 0, len(webAssetsSet))
