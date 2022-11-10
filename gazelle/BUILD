@@ -108,6 +108,7 @@ go_test(
         "lookup_types",
         "jsx_conversion",
         "jest_mock",
+        "dynamic_import",
         "import_alias",
     ]
 ]

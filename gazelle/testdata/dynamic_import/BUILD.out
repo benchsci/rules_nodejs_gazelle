@@ -1,0 +1,35 @@
+load("@com_github_benchsci_rules_nodejs_gazelle//:defs.bzl", "web_asset")
+load("@npm//@bazel/typescript:index.bzl", "ts_project")
+
+# gazelle:js_root
+# gazelle:js_web_asset json
+# gazelle:js_package_file package.json
+
+ts_project(
+    name = "a",
+    srcs = ["a.ts"],
+    deps = [
+        ":b",
+        ":c",
+    ],
+)
+
+ts_project(
+    name = "b",
+    srcs = ["b.ts"],
+)
+
+ts_project(
+    name = "c",
+    srcs = ["c.ts"],
+)
+
+ts_project(
+    name = "d",
+    srcs = ["d.ts"],
+)
+
+web_asset(
+    name = "package_json",
+    srcs = ["package.json"],
+)

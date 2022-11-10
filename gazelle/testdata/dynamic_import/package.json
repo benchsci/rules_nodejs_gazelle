@@ -1,0 +1,12 @@
+{
+    "name": "jest_require",
+    "description": "A test case",
+    "version": "0.0.0",
+    "dependencies": {
+        "jwt-decode": "^3.1.2"
+    },
+    "devDependencies": {
+        "jest": "^27.0.6",
+        "@types/jest": "^26.0.24"
+    }
+}
