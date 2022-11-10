@@ -61,12 +61,12 @@ const (
 var jsImportPattern = compileJsImportPattern()
 
 func compileJsImportPattern() *regexp.Regexp {
-	stringLiteralPattern := `'(?:.+|")*'|"(?:.+|')*"`
-	importPattern := `^import\s(?:(?:.|\n)+?from )??(?P<import>` + stringLiteralPattern + `).*?`
-	requirePattern := `^\s*?(?:const .+ = )?require\((?P<require>` + stringLiteralPattern + `)\).*`
-	exportPattern := `^export\s(?:(?:.|\n)+?from )??(?P<export>` + stringLiteralPattern + `).*?`
-	jestMockPattern := `^\s*?(?:const .+ = )?jest.mock\((?P<jestMock>` + stringLiteralPattern + `),.*`
-	dynamicImportPattern := `^.*?import\((?P<dynamicImport>` + stringLiteralPattern + `)\).*`
+	stringLiteralPattern := `'(?:[^)\n]+|")*'|"(?:[^)\n]+|')*"`
+	importPattern := `^import\s(?:(?:.|\n)+?from )??(?P<import>` + stringLiteralPattern + `)`
+	requirePattern := `^\s*?(?:const .+ = )?require\((?P<require>` + stringLiteralPattern + `)\)`
+	exportPattern := `^export\s(?:(?:.|\n)+?from )??(?P<export>` + stringLiteralPattern + `)`
+	jestMockPattern := `^\s*?(?:const .+ = )?jest.mock\((?P<jestMock>` + stringLiteralPattern + `),`
+	dynamicImportPattern := `^.*?import\((?P<dynamicImport>` + stringLiteralPattern + `)\)`
 	return regexp.MustCompile(`(?m)` + strings.Join([]string{importPattern, requirePattern, exportPattern, jestMockPattern, dynamicImportPattern}, "|"))
 }
 
