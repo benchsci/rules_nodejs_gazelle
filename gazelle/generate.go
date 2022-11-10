@@ -535,8 +535,8 @@ func isLocalImport(cwd string, path string) bool {
 	cwdSegments := strings.Split(cwd, "/")
 	importSegments := strings.Split(path, "/")
 	for i := 0; i < len(importSegments)-1; i++ {
-		j := len(importSegments) - i - 1 // ith deepest folder, minus file
-		k := len(cwdSegments) - i        // ith deepest folder
+		j := len(importSegments) - i - 2 // ith deepest folder, minus file
+		k := len(cwdSegments) - i - 1    // ith deepest folder
 		if j < 0 || k < 0 || importSegments[j] != cwdSegments[k] {
 			return false
 		}

@@ -1,0 +1,10 @@
+load("@npm//@bazel/typescript:index.bzl", "ts_project")
+
+ts_project(
+    name = "nested_module",
+    srcs = [
+        "index.ts",
+        "module_file.ts",
+    ],
+    tags = ["js_module"],
+)
