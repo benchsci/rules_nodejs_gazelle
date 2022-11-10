@@ -96,6 +96,7 @@ go_test(
         "fix",
         "aggregate_asset_modules",
         "disabled",
+        "disjoint_module",
         "aggregate_asset_singletons",
         "web_assets_module",
         "npm_label",
