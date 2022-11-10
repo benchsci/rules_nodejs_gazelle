@@ -1,0 +1,16 @@
+load("@npm//@bazel/typescript:index.bzl", "ts_project")
+
+# gazelle:js_root
+# gazelle:js_aggregate_modules
+# gazelle:js_quiet
+
+ts_project(
+    name = "index",
+    srcs = ["index.ts"],
+    deps = ["//my_module"],
+)
+
+ts_project(
+    name = "some_other_file",
+    srcs = ["some_other_file.ts"],
+)

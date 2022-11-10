@@ -217,14 +217,20 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		}
 		if aggregateModule {
 			// add as a module
-			i, r := lang.makeModuleRule(moduleRuleArgs{
-				ruleName: name,
+			moduleImports, moduleRules := lang.makeModuleRules(moduleRuleArgs{
+				pkgName:  name,
+				cwd:      args.Rel,
 				ruleType: getKind(args.Config, "ts_project"),
 				srcs:     tsSources,
 				imports:  tsImports,
 			}, jsConfig)
-			generatedRules = append(generatedRules, r)
-			generatedImports = append(generatedImports, i)
+			if !jsConfig.Quiet && len(moduleRules) > 1 {
+				log.Print(Warn("[WARN] disjoint module %s", args.Rel))
+			}
+			for i := range moduleRules {
+				generatedRules = append(generatedRules, moduleRules[i])
+				generatedImports = append(generatedImports, moduleImports[i])
+			}
 		} else {
 			// add as singletons
 			tsRules := lang.makeRules(ruleArgs{
@@ -243,14 +249,20 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 	if len(jsSources) > 0 {
 		if aggregateModule {
 			// add as a module
-			i, r := lang.makeModuleRule(moduleRuleArgs{
-				ruleName: pkgName,
+			moduleImports, moduleRules := lang.makeModuleRules(moduleRuleArgs{
+				pkgName:  pkgName,
+				cwd:      args.Rel,
 				ruleType: getKind(args.Config, "js_library"),
-				srcs:     jsSources,
-				imports:  jsImports,
+				srcs:     tsSources,
+				imports:  tsImports,
 			}, jsConfig)
-			generatedRules = append(generatedRules, r)
-			generatedImports = append(generatedImports, i)
+			if !jsConfig.Quiet && len(moduleRules) > 1 {
+				log.Print(Warn("[WARN] disjoint module %s", args.Rel))
+			}
+			for i := range moduleRules {
+				generatedRules = append(generatedRules, moduleRules[i])
+				generatedImports = append(generatedImports, moduleImports[i])
+			}
 		} else {
 			// add as singletons
 			jsRules := lang.makeRules(ruleArgs{
@@ -406,21 +418,98 @@ func (lang *JS) makeTestRule(args testRuleArgs, jsConfig *JsConfig) (*imports, *
 }
 
 type moduleRuleArgs struct {
-	ruleName string
+	pkgName  string
+	cwd      string
 	ruleType string
 	srcs     []string
 	imports  []imports
 }
 
-func (lang *JS) makeModuleRule(args moduleRuleArgs, jsConfig *JsConfig) (*imports, *rule.Rule) {
-	imps := aggregateImports(args.imports)
-	r := rule.NewRule(args.ruleType, args.ruleName)
-	r.SetAttr("srcs", args.srcs)
-	if len(jsConfig.Visibility.Labels) > 0 {
-		r.SetAttr("visibility", jsConfig.Visibility.Labels)
+func (lang *JS) makeModuleRules(args moduleRuleArgs, jsConfig *JsConfig) ([]*imports, []*rule.Rule) {
+
+	// identify the "index.js|ts" src file and include it in moduleSet
+	// all other source files start in remainderSet
+	indexKey := ""
+	moduleSet := make(map[string]imports)
+	remainderSet := make(map[string]imports)
+
+	for i, src := range args.srcs {
+		if isModuleFile(src) {
+			moduleSet[src] = args.imports[i]
+			indexKey = src
+		} else {
+			remainderSet[src] = args.imports[i]
+		}
 	}
-	r.SetAttr("tags", []string{"js_module"})
-	return imps, r
+
+	// recurse through each import for src file
+	// which, if it's local, transitively belongs in the moduleSet
+	recAddTransitiveSet := func(src string) {
+		// for each import that the source file has
+		for imp, _ := range moduleSet[src].set {
+			// if that import is local to this directory
+			if isLocalImport(args.cwd, imp) {
+				// check the remainderSet to see if the src file corresponding to the import
+				// exists and also hasn't been included in the module yet
+				basename := path.Base(imp)
+				for _, ext := range append(tsExtensions, jsExtensions...) {
+					filename := basename + ext
+					if _, ok := remainderSet[filename]; ok {
+						// copy the src file out of the remainderSet and into the moduleSet
+						moduleSet[filename] = remainderSet[filename]
+						delete(remainderSet, filename)
+						break
+					}
+				}
+			}
+		}
+	}
+
+	// start with index and recurse through imports
+	recAddTransitiveSet(indexKey)
+
+	// Accumulate Modules sources and imports into lists
+	moduleSrcs := make([]string, 0)
+	moduleImportsList := make([]imports, 0)
+	for src, imports := range moduleSet {
+		moduleSrcs = append(moduleSrcs, src)
+		moduleImportsList = append(moduleImportsList, imports)
+	}
+	moduleImports := aggregateImports(moduleImportsList)
+
+	// Use lists to make a rule
+	moduleRule := rule.NewRule(args.ruleType, args.pkgName)
+	moduleRule.SetAttr("srcs", moduleSrcs)
+	if len(jsConfig.Visibility.Labels) > 0 {
+		moduleRule.SetAttr("visibility", jsConfig.Visibility.Labels)
+	}
+	moduleRule.SetAttr("tags", []string{"js_module"})
+
+	// Accumulate remainder srcs and imports into lists
+	remainderSrcs := make([]string, 0)
+	remainderImportsList := make([]imports, 0)
+	for src, imps := range remainderSet {
+		remainderSrcs = append(remainderSrcs, src)
+		remainderImportsList = append(remainderImportsList, imps)
+	}
+
+	// Make remainder rules
+	remainderRules := lang.makeRules(ruleArgs{
+		ruleType: args.ruleType,
+		srcs:     remainderSrcs,
+		trimExt:  true,
+	}, jsConfig)
+
+	// Collate results
+	allImports := []*imports{moduleImports}
+	allRules := []*rule.Rule{moduleRule}
+
+	for _, imp := range remainderImportsList {
+		allImports = append(allImports, &imp) // Required to create references
+	}
+	allRules = append(allRules, remainderRules...)
+
+	return allImports, allRules
 }
 
 type ruleArgs struct {
@@ -470,6 +559,28 @@ func readFileAndParse(filePath string) *imports {
 	}
 
 	return &fileImports
+}
+
+func isLocalImport(cwd string, path string) bool {
+
+	// Special case for dot prefix without a folder
+	if strings.HasPrefix(path, "./") {
+		trimmed := strings.TrimPrefix(path, "./")
+		return len(strings.Split(trimmed, "/")) == 1
+	}
+
+	// Compare both import path with cwd path
+	// so "foo/bar/baz" matches "bar/baz/file.ts"
+	cwdSegments := strings.Split(cwd, "/")
+	importSegments := strings.Split(path, "/")
+	for i := 0; i < len(importSegments)-1; i++ {
+		j := len(importSegments) - i - 1 // ith deepest folder, minus file
+		k := len(cwdSegments) - i        // ith deepest folder
+		if j < 0 || k < 0 || importSegments[j] != cwdSegments[k] {
+			return false
+		}
+	}
+	return true
 }
 
 func aggregateImports(imps []imports) *imports {
