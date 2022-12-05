@@ -21,6 +21,12 @@ ts_project(
     srcs = ["b.ts"],
 )
 
+ts_project(
+    name = "builtin",
+    srcs = ["builtin.ts"],
+    deps = ["@npm//@types/node"],
+)
+
 web_asset(
     name = "package_json",
     srcs = ["package.json"],
