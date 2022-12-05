@@ -192,7 +192,12 @@ func (lang *JS) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Remote
 
 		// is it a builtin?
 		if _, ok := BUILTINS[name]; ok {
-			// Built in module -> ignore
+			// add @types/node when using node.js builtin and have @types/nodes installed
+			if jsConfig.LookupTypes && r.Kind() == "ts_project" {
+				if lang.isNpmDependency("@types/node", jsConfig) {
+					depSet[jsConfig.NpmLabel+"@types/node"] = true
+				}
+			}
 			continue
 		}
 
