@@ -111,7 +111,8 @@ func (parent *JsConfig) NewChild() *JsConfig {
 	child.Enabled = parent.Enabled
 	child.PackageFile = parent.PackageFile
 	child.NpmDependencies = parent.NpmDependencies // This is treated immutably
-	child.ImportAliases = make(map[string]string)  // copy map
+	child.LookupTypes = parent.LookupTypes
+	child.ImportAliases = make(map[string]string) // copy map
 	for k, v := range parent.ImportAliases {
 		child.ImportAliases[k] = v
 	}
