@@ -7,7 +7,8 @@
     "react": "^18.2.0"
   },
   "devDependencies": {
-    "@types/react": "^18.0.26",
-    "@types/lodash": "^4.17"
+    "@types/lodash": "^4.17",
+    "@types/node": "^18.11.10",
+    "@types/react": "^18.0.26"
   }
 }
