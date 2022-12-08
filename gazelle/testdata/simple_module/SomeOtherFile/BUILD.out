@@ -3,10 +3,10 @@ load("@npm//@bazel/typescript:index.bzl", "ts_project")
 # gazelle:js_aggregate_modules
 
 ts_project(
-    name = "my_module",
+    name = "SomeOtherFile",
     srcs = [
+        "SomeOtherFile.tsx",
         "index.ts",
-        "some_other_file.ts",
     ],
     tags = ["js_module"],
 )

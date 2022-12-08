@@ -6,5 +6,5 @@ load("@npm//@bazel/typescript:index.bzl", "ts_project")
 ts_project(
     name = "index",
     srcs = ["index.ts"],
-    deps = ["//my_module"],
+    deps = ["//SomeOtherFile"],
 )

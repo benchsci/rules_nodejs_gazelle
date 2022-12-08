@@ -417,6 +417,7 @@ func (lang *JS) makeModuleRules(args moduleRuleArgs, jsConfig *JsConfig) ([]*imp
 				// check the remainderSet to see if the src file corresponding to the import
 				// exists and also hasn't been included in the module yet
 				basename := path.Base(imp)
+
 				for _, ext := range append(tsExtensions, jsExtensions...) {
 					filename := basename + ext
 					if _, ok := remainderSet[filename]; ok {
@@ -453,9 +454,14 @@ func (lang *JS) makeModuleRules(args moduleRuleArgs, jsConfig *JsConfig) ([]*imp
 	// Accumulate remainder srcs and imports into lists
 	remainderSrcs := make([]string, 0)
 	remainderImportsList := make([]imports, 0)
-	for src, imps := range remainderSet {
-		remainderSrcs = append(remainderSrcs, src)
-		remainderImportsList = append(remainderImportsList, imps)
+	keys := make([]string, 0)
+	for k, _ := range remainderSet {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		remainderSrcs = append(remainderSrcs, k)
+		remainderImportsList = append(remainderImportsList, remainderSet[k])
 	}
 
 	// Make remainder rules
@@ -469,8 +475,14 @@ func (lang *JS) makeModuleRules(args moduleRuleArgs, jsConfig *JsConfig) ([]*imp
 	allImports := []*imports{moduleImports}
 	allRules := []*rule.Rule{moduleRule}
 
+	// Make a copy of imp to dereference
 	for _, imp := range remainderImportsList {
-		allImports = append(allImports, &imp) // Required to create references
+		copyImp := imp
+		copyImp.set = make(map[string]bool)
+		for k, v := range imp.set {
+			copyImp.set[k] = v
+		}
+		allImports = append(allImports, &copyImp) // Required to create references
 	}
 	allRules = append(allRules, remainderRules...)
 
