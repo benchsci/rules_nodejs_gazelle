@@ -1,0 +1,36 @@
+load("@com_github_benchsci_rules_nodejs_gazelle//:defs.bzl", "js_library")
+load("@npm//@bazel/typescript:index.bzl", "ts_project")
+
+# gazelle:js_root
+# gazelle:js_lookup_types
+# gazelle:js_package_file package.json
+
+ts_project(
+    name = "with_import",
+    srcs = ["with_import.tsx"],
+    deps = [
+        "@npm//@types/react",
+        "@npm//react",
+    ],
+)
+
+ts_project(
+    name = "without_import",
+    srcs = ["without_import.tsx"],
+    deps = [
+        "@npm//@types/react",
+        "@npm//react",
+    ],
+)
+
+js_library(
+    name = "js_with_import",
+    srcs = ["js_with_import.jsx"],
+    deps = ["@npm//react"],
+)
+
+js_library(
+    name = "js_without_import",
+    srcs = ["js_without_import.jsx"],
+    deps = ["@npm//react"],
+)

@@ -378,6 +378,7 @@ func extensionPattern(extensions []string) *regexp.Regexp {
 
 var indexFilePattern *regexp.Regexp
 var trimExtPattern *regexp.Regexp
+var reactFilePattern *regexp.Regexp
 
 func init() {
 	escaped := make([]string, len(tsExtensions)+len(jsExtensions))
@@ -394,6 +395,7 @@ func init() {
 			strings.Join(escaped, "|"),
 		),
 	)
+	reactFilePattern = regexp.MustCompile(`\.(jsx|tsx)$`)
 }
 
 func trimExt(baseName string) string {
@@ -406,6 +408,10 @@ func trimExt(baseName string) string {
 
 func isModuleFile(baseName string) bool {
 	return indexFilePattern.MatchString(baseName)
+}
+
+func isReactFile(baseName string) bool {
+	return reactFilePattern.MatchString(baseName)
 }
 
 func readBoolDirective(directive rule.Directive) bool {

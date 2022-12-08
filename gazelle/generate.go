@@ -188,6 +188,7 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 				continue
 			}
 		}
+		
 	}
 
 	if isModule && len(tsSources) > 0 && len(jsSources) > 0 {
@@ -333,7 +334,7 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 // called before the file is indexed. Unless c.ShouldFix is true, fixes
 // that delete or rename rules should not be performed.
 func (*JS) Fix(c *config.Config, f *rule.File) {
-
+	
 	jsConfigs := c.Exts[languageName].(JsConfigs)
 	jsConfig := jsConfigs[f.Pkg]
 
@@ -505,6 +506,12 @@ func readFileAndParse(filePath string) *imports {
 
 	fileImports := imports{
 		set: make(map[string]bool),
+	}
+
+	// If this file is a React component, always add react as dependency as the file could be using native
+	// JSX transpilation from React package that doesn't need the "import React" statement
+	if isReactFile(filePath) {
+		fileImports.set["react"] = true 
 	}
 
 	data, err := ioutil.ReadFile(filePath)
