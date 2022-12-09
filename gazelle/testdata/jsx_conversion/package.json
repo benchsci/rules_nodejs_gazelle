@@ -3,9 +3,11 @@
     "description": "A test case",
     "version": "0.0.0",
     "dependencies": {
-        "lodash": "^4.17"
+        "lodash": "^4.17",
+        "react": "^18.0.0"
     },
     "devDependencies": {
-        "@types/lodash": "^4.17"
+        "@types/lodash": "^4.17",
+        "@types/react": "^18.0.0"
     }
 }

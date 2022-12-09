@@ -10,6 +10,7 @@ js_library(
     deps = [
         ":b",
         "@npm//lodash",
+        "@npm//react",
     ],
 )
 

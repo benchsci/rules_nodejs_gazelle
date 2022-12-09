@@ -105,6 +105,7 @@ go_test(
         "simple_module",
         "simple_npm_library",
         "simple_library",
+        "react_example",
         "module_self_import",
         "lookup_types",
         "jsx_conversion",
