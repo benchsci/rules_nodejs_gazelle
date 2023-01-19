@@ -22,6 +22,7 @@ import (
 	"log"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/bazelbuild/bazel-gazelle/config"
@@ -85,7 +86,6 @@ func (lang *JS) Loads() []rule.LoadInfo {
 //
 // A GenerateResult struct is returned. Optional fields may be added to this
 // type in the future.
-//
 func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResult {
 
 	jsConfigs := args.Config.Exts[languageName].(JsConfigs)
@@ -188,7 +188,7 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 				continue
 			}
 		}
-		
+
 	}
 
 	if isModule && len(tsSources) > 0 && len(jsSources) > 0 {
@@ -245,6 +245,9 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 	for fl := range webAssetsSet {
 		webAssets = append(webAssets, fl)
 	}
+	// always deterministic results
+	sort.Strings(webAssets)
+
 	if len(webAssets) > 0 {
 		// Generate web_asset rule(s)
 
@@ -334,7 +337,7 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 // called before the file is indexed. Unless c.ShouldFix is true, fixes
 // that delete or rename rules should not be performed.
 func (*JS) Fix(c *config.Config, f *rule.File) {
-	
+
 	jsConfigs := c.Exts[languageName].(JsConfigs)
 	jsConfig := jsConfigs[f.Pkg]
 
@@ -511,7 +514,7 @@ func readFileAndParse(filePath string) *imports {
 	// If this file is a React component, always add react as dependency as the file could be using native
 	// JSX transpilation from React package that doesn't need the "import React" statement
 	if isReactFile(filePath) {
-		fileImports.set["react"] = true 
+		fileImports.set["react"] = true
 	}
 
 	data, err := ioutil.ReadFile(filePath)
