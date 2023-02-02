@@ -80,35 +80,35 @@ func parseCodeBlock(data []byte) ([]string, error) {
 			if err != nil {
 				return nil, fmt.Errorf("unquoting string literal %s from js, %v", match[IMPORT], err)
 			}
-			imports = append(imports, strings.ToLower(unquoted))
+			imports = append(imports, unquoted)
 
 		case match[REQUIRE] != nil:
 			unquoted, err := unquoteImportString(match[REQUIRE])
 			if err != nil {
 				return nil, fmt.Errorf("unquoting string literal %s from js, %v", match[REQUIRE], err)
 			}
-			imports = append(imports, strings.ToLower(unquoted))
+			imports = append(imports, unquoted)
 
 		case match[EXPORT] != nil:
 			unquoted, err := unquoteImportString(match[EXPORT])
 			if err != nil {
 				return nil, fmt.Errorf("unquoting string literal %s from js, %v", match[EXPORT], err)
 			}
-			imports = append(imports, strings.ToLower(unquoted))
+			imports = append(imports, unquoted)
 
 		case match[JEST_MOCK] != nil:
 			unquoted, err := unquoteImportString(match[JEST_MOCK])
 			if err != nil {
 				return nil, fmt.Errorf("unquoting string literal %s from js, %v", match[JEST_MOCK], err)
 			}
-			imports = append(imports, strings.ToLower(unquoted))
+			imports = append(imports, unquoted)
 
 		case match[DYNAMIC_IMPORT] != nil:
 			unquoted, err := unquoteImportString(match[DYNAMIC_IMPORT])
 			if err != nil {
 				return nil, fmt.Errorf("unquoting string literal %s from js, %v", match[DYNAMIC_IMPORT], err)
 			}
-			imports = append(imports, strings.ToLower(unquoted))
+			imports = append(imports, unquoted)
 
 		default:
 			// Comment matched. Nothing to extract.

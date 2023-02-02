@@ -54,7 +54,7 @@ func TestParseJS(t *testing.T) {
 			name: "two.sass",
 			js: `import {format} from 'date-fns'
 import Puppy from '@/components/Puppy';`,
-			want: []string{"@/components/puppy", "date-fns"},
+			want: []string{"@/components/Puppy", "date-fns"},
 		}, {
 			desc: "import depth",
 			name: "deep.sass",
