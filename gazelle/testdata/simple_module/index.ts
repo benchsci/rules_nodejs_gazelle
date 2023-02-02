@@ -1,3 +1,3 @@
-import { some_var } from "./my_module"
+import { some_var } from "./SomeOtherFile";
 
-var _ = some_var
+var _ = some_var;

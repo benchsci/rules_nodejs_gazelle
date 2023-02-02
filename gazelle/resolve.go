@@ -108,7 +108,7 @@ func (lang *JS) Imports(c *config.Config, r *rule.Rule, f *rule.File) []resolve.
 		filePath := path.Join(f.Pkg, src)
 		importSpecs[i] = resolve.ImportSpec{
 			Lang: lang.Name(),
-			Imp:  strings.ToLower(filePath),
+			Imp:  filePath,
 		}
 	}
 
@@ -116,7 +116,7 @@ func (lang *JS) Imports(c *config.Config, r *rule.Rule, f *rule.File) []resolve.
 	if isModule {
 		importSpecs[n-1] = resolve.ImportSpec{
 			Lang: lang.Name(),
-			Imp:  strings.ToLower(f.Pkg),
+			Imp:  f.Pkg,
 		}
 	}
 
@@ -162,7 +162,6 @@ func (lang *JS) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Remote
 	imports := _imports.(*imports)
 	depSet := make(map[string]bool)
 	dataSet := make(map[string]bool)
-
 	for name := range imports.set {
 
 		// is it a package.json import?
@@ -228,6 +227,9 @@ func (lang *JS) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Remote
 	}
 	if len(deps) > 0 {
 		r.SetAttr("deps", deps)
+	} else {
+		r.DelAttr("deps")
+
 	}
 
 	data := []string{}
@@ -367,7 +369,7 @@ func (lang *JS) tryResolve(target string, c *config.Config, ix *resolve.RuleInde
 
 	importSpec := resolve.ImportSpec{
 		Lang: lang.Name(),
-		Imp:  strings.ToLower(target),
+		Imp:  target,
 	}
 	if override, ok := resolve.FindRuleWithOverride(c, importSpec, lang.Name()); ok {
 		if override.Repo == "" {
