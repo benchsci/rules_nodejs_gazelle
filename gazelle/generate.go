@@ -18,8 +18,8 @@ package js
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
+	"os"
 	"path"
 	"path/filepath"
 	"sort"
@@ -76,6 +76,15 @@ func (lang *JS) Loads() []rule.LoadInfo {
 	}
 }
 
+func getKind(c *config.Config, kindName string) string {
+	// Extract kind_name from KindMap
+	if kind, ok := c.KindMap[kindName]; ok {
+		return kind.KindName
+
+	}
+	return kindName
+}
+
 // GenerateRules extracts build metadata from source files in a directory.
 // GenerateRules is called in each directory where an update is requested
 // in depth-first post-order.
@@ -96,22 +105,57 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		return language.GenerateResult{}
 	}
 
-	existingRules := make(map[string]*rule.Rule)
-
-	// BUILD file exists?
-	if BUILD := args.File; BUILD != nil {
-		// For each existing rule
-		for _, r := range BUILD.Rules {
-			if _, ok := managedRulesSet[r.Kind()]; !ok {
-				// not a managed rule
-				continue
-			}
-			existingRules[r.Name()] = r
-		}
-	}
-
 	pkgName := PkgName(args.Rel)
 
+	var webAssetsSet,
+		tsSources,
+		tsImports,
+		jsSources,
+		jsImports,
+		generatedRules,
+		generatedImports,
+		isModule,
+		isJSRoot = lang.readFiles(args, jsConfig)
+
+	if isModule && len(tsSources) > 0 && len(jsSources) > 0 {
+		log.Print(Warn("[WARN] ts and js files mixed in module %s", pkgName))
+	}
+
+	aggregateModule := jsConfig.AggregateModules && isModule && !isJSRoot
+
+	// add "ts_project" rule(s)
+	appendTS := len(jsSources) > 0
+	generatedTSRules, generatedTSImports := lang.genRules(args, jsConfig, aggregateModule, pkgName, tsSources, tsImports, appendTS, "ts_project")
+	generatedRules = append(generatedRules, generatedTSRules...)
+	generatedImports = append(generatedImports, generatedTSImports...)
+
+	// add "js_library" rule(s)
+	appendTS = false
+	generatedJSRules, generatedJSImports := lang.genRules(args, jsConfig, aggregateModule, pkgName, jsSources, jsImports, appendTS, "js_library")
+	generatedRules = append(generatedRules, generatedJSRules...)
+	generatedImports = append(generatedImports, generatedJSImports...)
+
+	// add "web_asset" rule(s)
+	generatedWARules, generatedWAImports := lang.genWebAssets(args, webAssetsSet, jsConfig)
+	generatedRules = append(generatedRules, generatedWARules...)
+	generatedImports = append(generatedImports, generatedWAImports...)
+
+	// add "all_assets" "web_assets" rule
+	generatedAWARules, generatedAWAImports := lang.genAllAssets(args, isJSRoot, jsConfig)
+	generatedRules = append(generatedRules, generatedAWARules...)
+	generatedImports = append(generatedImports, generatedAWAImports...)
+
+	existingRules := lang.readExistingRules(args)
+	lang.pruneManagedRules(existingRules, generatedRules)
+
+	return language.GenerateResult{
+		Gen:     generatedRules,
+		Empty:   []*rule.Rule{},
+		Imports: generatedImports,
+	}
+}
+
+func (lang *JS) readFiles(args language.GenerateArgs, jsConfig *JsConfig) (map[string]bool, []string, []imports, []string, []imports, []*rule.Rule, []interface{}, bool, bool) {
 	managedFiles := make(map[string]bool)
 	webAssetsSet := make(map[string]bool)
 
@@ -136,28 +180,14 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		// TS DEFINITIONS ".d.ts"
 		match := tsDefsExtensionsPattern.FindStringSubmatch(baseName)
 		if len(match) > 0 {
-			r := rule.NewRule(getKind(args.Config, "ts_definition"), strings.TrimSuffix(baseName, match[0])+".d")
-			r.SetAttr("srcs", []string{baseName})
-			if len(jsConfig.Visibility.Labels) > 0 {
-				r.SetAttr("visibility", jsConfig.Visibility.Labels)
-			}
-
-			generatedRules = append(generatedRules, r)
-			generatedImports = append(generatedImports, &noImports)
+			generatedRules, generatedImports = lang.genTSDefinition(args, baseName, match, jsConfig, generatedRules, generatedImports)
 			continue
 		}
 
 		// TS & JS TEST
 		match = append(jsTestExtensionsPattern.FindStringSubmatch(baseName), tsTestExtensionsPattern.FindStringSubmatch(baseName)...)
 		if len(match) > 0 {
-			i, r := lang.makeTestRule(testRuleArgs{
-				ruleType:  getKind(args.Config, "jest_test"),
-				extension: match[0],
-				filePath:  filePath,
-				baseName:  baseName,
-			}, jsConfig)
-			generatedRules = append(generatedRules, r)
-			generatedImports = append(generatedImports, i)
+			generatedRules, generatedImports = lang.genJestTest(args, match, filePath, baseName, jsConfig, generatedRules, generatedImports)
 			continue
 		}
 
@@ -190,178 +220,58 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		}
 
 	}
-
-	if isModule && len(tsSources) > 0 && len(jsSources) > 0 {
-		log.Print(Warn("[WARN] ts and js files mixed in module %s", pkgName))
-	}
-
-	aggregateModule := jsConfig.AggregateModules && isModule && !isJSRoot
-
-	// add "ts_project" rule(s)
-	genRules := func(kindSources []string, kindImports []imports, appendTS bool, kind string) {
-		if len(kindSources) > 0 {
-			name := pkgName
-			if appendTS {
-				name = name + ".ts"
-			}
-			if aggregateModule {
-				// add as a module
-				moduleImports, moduleRules := lang.makeModuleRules(moduleRuleArgs{
-					pkgName:  name,
-					cwd:      args.Rel,
-					ruleType: getKind(args.Config, kind),
-					srcs:     kindSources,
-					imports:  kindImports,
-				}, jsConfig)
-				if !jsConfig.Quiet && len(moduleRules) > 1 {
-					log.Print(Warn("[WARN] disjoint module %s", args.Rel))
-				}
-				for i := range moduleRules {
-					generatedRules = append(generatedRules, moduleRules[i])
-					generatedImports = append(generatedImports, moduleImports[i])
-				}
-			} else {
-				// add as singletons
-				singletonRules := lang.makeRules(ruleArgs{
-					ruleType: getKind(args.Config, kind),
-					srcs:     kindSources,
-					trimExt:  true,
-				}, jsConfig)
-				for i := range singletonRules {
-					generatedRules = append(generatedRules, singletonRules[i])
-					generatedImports = append(generatedImports, &kindImports[i])
-				}
-			}
-		}
-	}
-
-	// add ts_project rules
-	genRules(tsSources, tsImports, len(jsSources) > 0, "ts_project")
-	// add js_library rules
-	genRules(jsSources, jsImports, false, "js_library")
-
-	// read webAssetsSet to list
-	webAssets := make([]string, 0, len(webAssetsSet))
-	for fl := range webAssetsSet {
-		webAssets = append(webAssets, fl)
-	}
-	// always deterministic results
-	sort.Strings(webAssets)
-
-	if len(webAssets) > 0 {
-		// Generate web_asset rule(s)
-
-		if jsConfig.AggregateWebAssets {
-			// aggregate rule
-			name := "assets"
-			r := rule.NewRule(getKind(args.Config, "web_assets"), name)
-			r.SetAttr("srcs", webAssets)
-			if len(jsConfig.Visibility.Labels) > 0 {
-				r.SetAttr("visibility", jsConfig.Visibility.Labels)
-			}
-
-			generatedRules = append(generatedRules, r)
-			generatedImports = append(generatedImports, &noImports)
-
-			// record all webAssets rules for all_assets rule later
-			fqName := fmt.Sprintf("//%s:%s", path.Join(args.Rel), name)
-			jsConfig.AggregatedAssets[fqName] = true
-
-		} else {
-			// add as singletons
-			rules := lang.makeRules(ruleArgs{
-				ruleType: getKind(args.Config, "web_asset"),
-				srcs:     webAssets,
-				trimExt:  false, //shadow the original file name
-			}, jsConfig)
-
-			for _, r := range rules {
-				generatedRules = append(generatedRules, r)
-				generatedImports = append(generatedImports, &noImports)
-
-				// record all webAssets rules for all_assets rule later
-				fqName := fmt.Sprintf("//%s:%s", path.Join(args.Rel), r.Name())
-				jsConfig.AggregatedAssets[fqName] = true
-			}
-		}
-	}
-
-	if isJSRoot && jsConfig.AggregateAllAssets {
-		// Generate all_assets rule
-		JSRootDeps := []string{}
-		for fqName := range jsConfig.AggregatedAssets {
-			JSRootDeps = append(JSRootDeps, fqName)
-		}
-		name := "all_assets"
-		r := rule.NewRule(getKind(args.Config, "web_assets"), name)
-		r.SetAttr("srcs", JSRootDeps)
-
-		generatedRules = append(generatedRules, r)
-		generatedImports = append(generatedImports, &noImports)
-	}
-
-	// Generate a list of rules that may be deleted
-	// This is generated from existing rules that are managed by gazelle
-	// that didn't get generated this run
-
-	// Populate set with existing rules
-	deleteRulesSet := make(map[string]*rule.Rule)
-	for _, existingRule := range existingRules {
-		// use kind/name to enable deletion of old rules when a new rule would use the same name
-		key := fmt.Sprintf("%s/%s", existingRule.Kind(), existingRule.Name())
-		deleteRulesSet[key] = existingRule
-	}
-
-	// Prune generated rules
-	for _, generatedRule := range generatedRules {
-		key := fmt.Sprintf("%s/%s", generatedRule.Kind(), generatedRule.Name())
-		delete(deleteRulesSet, key)
-	}
-
-	for _, r := range deleteRulesSet {
-		// Is this rule managed by Gazelle?
-		if _, ok := managedRulesSet[r.Kind()]; ok {
-			// It is managed, and wasn't generated, so delete it
-			r.Delete()
-		}
-	}
-
-	return language.GenerateResult{
-		Gen:     generatedRules,
-		Empty:   []*rule.Rule{},
-		Imports: generatedImports,
-	}
+	return webAssetsSet, tsSources, tsImports, jsSources, jsImports, generatedRules, generatedImports, isModule, isJSRoot
 }
 
-// Fix repairs deprecated usage of language-specific rules in f. This is
-// called before the file is indexed. Unless c.ShouldFix is true, fixes
-// that delete or rename rules should not be performed.
-func (*JS) Fix(c *config.Config, f *rule.File) {
+func readFileAndParse(filePath string) *imports {
 
-	jsConfigs := c.Exts[languageName].(JsConfigs)
-	jsConfig := jsConfigs[f.Pkg]
-
-	if c.ShouldFix || jsConfig.Fix {
-		for _, r := range f.Rules {
-			// delete deprecated js_import rule
-			if r.Kind() == "js_import" {
-				r.Delete()
-			}
-			// delete deprecated ts_library rule
-			if r.Kind() == "ts_library" {
-				r.Delete()
-			}
-		}
-		for _, l := range f.Loads {
-
-			if l.Has("js_import") {
-				l.Remove("js_import")
-			}
-			if l.Has("ts_library") {
-				l.Remove("ts_library")
-			}
-		}
+	fileImports := imports{
+		set: make(map[string]bool),
 	}
+
+	// If this file is a React component, always add react as dependency as the file could be using native
+	// JSX transpilation from React package that doesn't need the "import React" statement
+	if isReactFile(filePath) {
+		fileImports.set["react"] = true
+	}
+
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		log.Fatalf(Err("Error reading %s: %v", filePath, err))
+	}
+	jsImports, err := ParseJS(data)
+	if err != nil {
+		log.Fatalf(Err("Error parsing %s: %v", filePath, err))
+	}
+	for _, imp := range jsImports {
+		fileImports.set[imp] = true
+	}
+
+	return &fileImports
+}
+
+func (lang *JS) genTSDefinition(args language.GenerateArgs, baseName string, match []string, jsConfig *JsConfig, generatedRules []*rule.Rule, generatedImports []interface{}) ([]*rule.Rule, []interface{}) {
+	r := rule.NewRule(getKind(args.Config, "ts_definition"), strings.TrimSuffix(baseName, match[0])+".d")
+	r.SetAttr("srcs", []string{baseName})
+	if len(jsConfig.Visibility.Labels) > 0 {
+		r.SetAttr("visibility", jsConfig.Visibility.Labels)
+	}
+
+	generatedRules = append(generatedRules, r)
+	generatedImports = append(generatedImports, &noImports)
+	return generatedRules, generatedImports
+}
+
+func (lang *JS) genJestTest(args language.GenerateArgs, match []string, filePath string, baseName string, jsConfig *JsConfig, generatedRules []*rule.Rule, generatedImports []interface{}) ([]*rule.Rule, []interface{}) {
+	i, r := lang.makeTestRule(testRuleArgs{
+		ruleType:  getKind(args.Config, "jest_test"),
+		extension: match[0],
+		filePath:  filePath,
+		baseName:  baseName,
+	}, jsConfig)
+	generatedRules = append(generatedRules, r)
+	generatedImports = append(generatedImports, i)
+	return generatedRules, generatedImports
 }
 
 type testRuleArgs struct {
@@ -380,6 +290,77 @@ func (lang *JS) makeTestRule(args testRuleArgs, jsConfig *JsConfig) (*imports, *
 		r.SetAttr("visibility", jsConfig.Visibility.Labels)
 	}
 	return imps, r
+}
+
+func (lang *JS) genRules(args language.GenerateArgs, jsConfig *JsConfig, aggregateModule bool, pkgName string, kindSources []string, kindImports []imports, appendTS bool, kind string) ([]*rule.Rule, []interface{}) {
+
+	generatedRules := make([]*rule.Rule, 0)
+	generatedImports := make([]interface{}, 0)
+
+	if len(kindSources) > 0 {
+		name := pkgName
+		if appendTS {
+			name = name + ".ts"
+		}
+		if aggregateModule {
+			// add as a module
+			moduleImports, moduleRules := lang.makeModuleRules(moduleRuleArgs{
+				pkgName:  name,
+				cwd:      args.Rel,
+				ruleType: getKind(args.Config, kind),
+				srcs:     kindSources,
+				imports:  kindImports,
+			}, jsConfig)
+			if !jsConfig.Quiet && len(moduleRules) > 1 {
+				log.Print(Warn("[WARN] disjoint module %s", args.Rel))
+			}
+			for i := range moduleRules {
+				generatedRules = append(generatedRules, moduleRules[i])
+				generatedImports = append(generatedImports, moduleImports[i])
+			}
+		} else {
+			// add as singletons
+			singletonRules := lang.makeRules(ruleArgs{
+				ruleType: getKind(args.Config, kind),
+				srcs:     kindSources,
+				trimExt:  true,
+			}, jsConfig)
+			for i := range singletonRules {
+				generatedRules = append(generatedRules, singletonRules[i])
+				generatedImports = append(generatedImports, &kindImports[i])
+			}
+		}
+	}
+
+	return generatedRules, generatedImports
+}
+
+type ruleArgs struct {
+	ruleType string
+	srcs     []string
+	trimExt  bool
+}
+
+func (lang *JS) makeRules(args ruleArgs, jsConfig *JsConfig) []*rule.Rule {
+	rules := []*rule.Rule{}
+	for _, src := range args.srcs {
+		var name string
+		if args.trimExt {
+			name = trimExt(src)
+		} else {
+			name = strings.ReplaceAll(src, ".", "_")
+			if name == src {
+				name += ".file"
+			}
+		}
+		r := rule.NewRule(args.ruleType, name)
+		r.SetAttr("srcs", []string{src})
+		if len(jsConfig.Visibility.Labels) > 0 {
+			r.SetAttr("visibility", jsConfig.Visibility.Labels)
+		}
+		rules = append(rules, r)
+	}
+	return rules
 }
 
 type moduleRuleArgs struct {
@@ -489,61 +470,6 @@ func (lang *JS) makeModuleRules(args moduleRuleArgs, jsConfig *JsConfig) ([]*imp
 	return allImports, allRules
 }
 
-type ruleArgs struct {
-	ruleType string
-	srcs     []string
-	trimExt  bool
-}
-
-func (lang *JS) makeRules(args ruleArgs, jsConfig *JsConfig) []*rule.Rule {
-	rules := []*rule.Rule{}
-	for _, src := range args.srcs {
-		var name string
-		if args.trimExt {
-			name = trimExt(src)
-		} else {
-			name = strings.ReplaceAll(src, ".", "_")
-			if name == src {
-				name += ".file"
-			}
-		}
-		r := rule.NewRule(args.ruleType, name)
-		r.SetAttr("srcs", []string{src})
-		if len(jsConfig.Visibility.Labels) > 0 {
-			r.SetAttr("visibility", jsConfig.Visibility.Labels)
-		}
-		rules = append(rules, r)
-	}
-	return rules
-}
-
-func readFileAndParse(filePath string) *imports {
-
-	fileImports := imports{
-		set: make(map[string]bool),
-	}
-
-	// If this file is a React component, always add react as dependency as the file could be using native
-	// JSX transpilation from React package that doesn't need the "import React" statement
-	if isReactFile(filePath) {
-		fileImports.set["react"] = true
-	}
-
-	data, err := ioutil.ReadFile(filePath)
-	if err != nil {
-		log.Fatalf(Err("Error reading %s: %v", filePath, err))
-	}
-	jsImports, err := ParseJS(data)
-	if err != nil {
-		log.Fatalf(Err("Error parsing %s: %v", filePath, err))
-	}
-	for _, imp := range jsImports {
-		fileImports.set[imp] = true
-	}
-
-	return &fileImports
-}
-
 func isLocalImport(cwd string, path string) bool {
 
 	// Special case for dot prefix without a folder
@@ -580,11 +506,153 @@ func aggregateImports(imps []imports) *imports {
 	return &aggregatedImports
 }
 
-func getKind(c *config.Config, kind_name string) string {
-	// Extract kind_name from KindMap
-	if kind, ok := c.KindMap[kind_name]; ok {
-		return kind.KindName
+func (lang *JS) genWebAssets(args language.GenerateArgs, webAssetsSet map[string]bool, jsConfig *JsConfig) ([]*rule.Rule, []interface{}) {
 
+	generatedRules := make([]*rule.Rule, 0)
+	generatedImports := make([]interface{}, 0)
+
+	// read webAssetsSet to list
+	webAssets := make([]string, 0, len(webAssetsSet))
+	for fl := range webAssetsSet {
+		webAssets = append(webAssets, fl)
 	}
-	return kind_name
+	// always deterministic results
+	sort.Strings(webAssets)
+
+	if len(webAssets) > 0 {
+		// Generate web_asset rule(s)
+
+		if jsConfig.AggregateWebAssets {
+			// aggregate rule
+			name := "assets"
+			r := rule.NewRule(getKind(args.Config, "web_assets"), name)
+			r.SetAttr("srcs", webAssets)
+			if len(jsConfig.Visibility.Labels) > 0 {
+				r.SetAttr("visibility", jsConfig.Visibility.Labels)
+			}
+
+			generatedRules = append(generatedRules, r)
+			generatedImports = append(generatedImports, &noImports)
+
+			// record all webAssets rules for all_assets rule later
+			fqName := fmt.Sprintf("//%s:%s", path.Join(args.Rel), name)
+			jsConfig.AggregatedAssets[fqName] = true
+
+		} else {
+			// add as singletons
+			rules := lang.makeRules(ruleArgs{
+				ruleType: getKind(args.Config, "web_asset"),
+				srcs:     webAssets,
+				trimExt:  false, //shadow the original file name
+			}, jsConfig)
+
+			for _, r := range rules {
+				generatedRules = append(generatedRules, r)
+				generatedImports = append(generatedImports, &noImports)
+
+				// record all webAssets rules for all_assets rule later
+				fqName := fmt.Sprintf("//%s:%s", path.Join(args.Rel), r.Name())
+				jsConfig.AggregatedAssets[fqName] = true
+			}
+		}
+	}
+
+	return generatedRules, generatedImports
+}
+
+func (lang *JS) genAllAssets(args language.GenerateArgs, isJSRoot bool, jsConfig *JsConfig) ([]*rule.Rule, []interface{}) {
+	generatedRules := make([]*rule.Rule, 0)
+	generatedImports := make([]interface{}, 0)
+
+	if isJSRoot && jsConfig.AggregateAllAssets {
+		// Generate all_assets rule
+		JSRootDeps := []string{}
+		for fqName := range jsConfig.AggregatedAssets {
+			JSRootDeps = append(JSRootDeps, fqName)
+		}
+		name := "all_assets"
+		r := rule.NewRule(getKind(args.Config, "web_assets"), name)
+		r.SetAttr("srcs", JSRootDeps)
+
+		generatedRules = append(generatedRules, r)
+		generatedImports = append(generatedImports, &noImports)
+	}
+
+	return generatedRules, generatedImports
+}
+
+func (lang *JS) readExistingRules(args language.GenerateArgs) map[string]*rule.Rule {
+	existingRules := make(map[string]*rule.Rule)
+
+	// BUILD file exists?
+	if BUILD := args.File; BUILD != nil {
+		// For each existing rule
+		for _, r := range BUILD.Rules {
+			if _, ok := managedRulesSet[r.Kind()]; !ok {
+				// not a managed rule
+				continue
+			}
+			existingRules[r.Name()] = r
+		}
+	}
+	return existingRules
+}
+
+func (lang *JS) pruneManagedRules(existingRules map[string]*rule.Rule, generatedRules []*rule.Rule) {
+	// Generate a list of rules that may be deleted and mark them for deletion
+	// This is generated from existing rules that are managed by gazelle
+	// that didn't get generated this run
+
+	// Populate set with existing rules
+	deleteRulesSet := make(map[string]*rule.Rule)
+	for _, existingRule := range existingRules {
+		// use kind/name to enable deletion of old rules when a new rule would use the same name
+		key := fmt.Sprintf("%s/%s", existingRule.Kind(), existingRule.Name())
+		deleteRulesSet[key] = existingRule
+	}
+
+	// Prune generated rules
+	for _, generatedRule := range generatedRules {
+		key := fmt.Sprintf("%s/%s", generatedRule.Kind(), generatedRule.Name())
+		delete(deleteRulesSet, key)
+	}
+
+	for _, r := range deleteRulesSet {
+		// Is this rule managed by Gazelle?
+		if _, ok := managedRulesSet[r.Kind()]; ok {
+			// It is managed, and wasn't generated, so delete it
+			r.Delete()
+		}
+	}
+}
+
+// Fix repairs deprecated usage of language-specific rules in f. This is
+// called before the file is indexed. Unless c.ShouldFix is true, fixes
+// that delete or rename rules should not be performed.Í
+func (*JS) Fix(c *config.Config, f *rule.File) {
+
+	jsConfigs := c.Exts[languageName].(JsConfigs)
+	jsConfig := jsConfigs[f.Pkg]
+
+	if c.ShouldFix || jsConfig.Fix {
+		for _, r := range f.Rules {
+			// delete deprecated js_import rule
+			if r.Kind() == "js_import" {
+				r.Delete()
+			}
+			// delete deprecated ts_library rule
+			if r.Kind() == "ts_library" {
+				r.Delete()
+			}
+		}
+		for _, l := range f.Loads {
+
+			if l.Has("js_import") {
+				l.Remove("js_import")
+			}
+			if l.Has("ts_library") {
+				l.Remove("ts_library")
+			}
+		}
+	}
 }
