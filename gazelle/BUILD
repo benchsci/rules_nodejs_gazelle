@@ -16,6 +16,11 @@
 
 load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
+# gazelle:exclude gazelle_test.go
+# gazelle:exclude generate_test.go
+# gazelle:exclude parse_test.go
+# gazelle:exclude pkgname_test.go
+
 go_library(
     name = "gazelle",
     srcs = [
@@ -28,7 +33,7 @@ go_library(
         "pkgname.go",
         "resolve.go",
     ],
-    importpath = "benchsci.com/gazelle/v2",
+    importpath = "github.com/benchsci/rules_nodejs_gazelle/gazelle",
     visibility = ["//visibility:public"],
     deps = [
         "@bazel_gazelle//config:go_default_library",
@@ -37,7 +42,6 @@ go_library(
         "@bazel_gazelle//repo:go_default_library",
         "@bazel_gazelle//resolve:go_default_library",
         "@bazel_gazelle//rule:go_default_library",
-        "@com_github_bazelbuild_buildtools//build:go_default_library",
     ],
 )
 
@@ -52,9 +56,7 @@ TEST_DEPS = [
 
 go_test(
     name = "generate_test",
-    srcs = [
-        "generate_test.go",
-    ],
+    srcs = ["generate_test.go"],
     embed = [":gazelle"],
     importpath = "benchsci.com/gazelle/v2",
     rundir = ".",
@@ -63,9 +65,7 @@ go_test(
 
 go_test(
     name = "parse_test",
-    srcs = [
-        "parse_test.go",
-    ],
+    srcs = ["parse_test.go"],
     embed = [":gazelle"],
     importpath = "benchsci.com/gazelle/v2",
     rundir = ".",
@@ -74,9 +74,7 @@ go_test(
 
 go_test(
     name = "pkgname_test",
-    srcs = [
-        "pkgname_test.go",
-    ],
+    srcs = ["pkgname_test.go"],
     embed = [":gazelle"],
     importpath = "benchsci.com/gazelle/v2",
     rundir = ".",
@@ -88,29 +86,30 @@ go_test(
         name = "gazelle_{}".format(t),
         srcs = ["gazelle_test.go"],
         data = [
-            "//:gazelle_bin",
+            "//:test_gazelle_bin",
         ] + glob(["testdata/{}/**".format(t)]),
         deps = TEST_DEPS,
     )
     for t in [
-        "fix",
         "aggregate_asset_modules",
+        "aggregate_asset_singletons",
         "disabled",
         "disjoint_module",
-        "aggregate_asset_singletons",
-        "web_assets_module",
+        "dynamic_import",
+        "fix",
+        "folder_rules",
+        "import_alias",
+        "jest_mock",
+        "jsx_conversion",
+        "lookup_types",
+        "module_self_import",
         "npm_label",
-        "visibility",
-        "ts_conversion",
+        "react_example",
+        "simple_library",
         "simple_module",
         "simple_npm_library",
-        "simple_library",
-        "react_example",
-        "module_self_import",
-        "lookup_types",
-        "jsx_conversion",
-        "jest_mock",
-        "dynamic_import",
-        "import_alias",
+        "ts_conversion",
+        "visibility",
+        "web_assets_module",
     ]
 ]

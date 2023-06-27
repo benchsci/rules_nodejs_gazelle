@@ -18,6 +18,7 @@ package js
 
 import (
 	"fmt"
+	"io/fs"
 	"log"
 	"os"
 	"path"
@@ -107,33 +108,51 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 
 	pkgName := PkgName(args.Rel)
 
-	var webAssetsSet,
+	generatedRules := make([]*rule.Rule, 0)
+	generatedImports := make([]interface{}, 0)
+
+	var tsdSources,
+		jestSources,
 		tsSources,
-		tsImports,
 		jsSources,
-		jsImports,
-		generatedRules,
-		generatedImports,
+		webAssetsSet,
 		isModule,
-		isJSRoot = lang.readFiles(args, jsConfig)
+		isJSRoot = lang.collectSources(args, jsConfig)
 
 	if isModule && len(tsSources) > 0 && len(jsSources) > 0 {
 		log.Print(Warn("[WARN] ts and js files mixed in module %s", pkgName))
 	}
 
-	aggregateModule := jsConfig.AggregateModules && isModule && !isJSRoot
+	// add "ts_definition" rule(s)
+	generatedTSDRules, generatedTSDImports := lang.genTSDefinition(args, jsConfig, tsdSources)
+	generatedRules = append(generatedRules, generatedTSDRules...)
+	generatedImports = append(generatedImports, generatedTSDImports...)
 
-	// add "ts_project" rule(s)
-	appendTS := len(jsSources) > 0
-	generatedTSRules, generatedTSImports := lang.genRules(args, jsConfig, aggregateModule, pkgName, tsSources, tsImports, appendTS, "ts_project")
-	generatedRules = append(generatedRules, generatedTSRules...)
-	generatedImports = append(generatedImports, generatedTSImports...)
+	// add "jest_test" rule(s)
+	generatedTestRules, generatedTestImports := lang.genJestTest(args, jsConfig, jestSources)
+	generatedRules = append(generatedRules, generatedTestRules...)
+	generatedImports = append(generatedImports, generatedTestImports...)
 
-	// add "js_library" rule(s)
-	appendTS = false
-	generatedJSRules, generatedJSImports := lang.genRules(args, jsConfig, aggregateModule, pkgName, jsSources, jsImports, appendTS, "js_library")
-	generatedRules = append(generatedRules, generatedJSRules...)
-	generatedImports = append(generatedImports, generatedJSImports...)
+	appendTSExt := len(jsSources) > 0
+
+	if len(jsSources) > 0 && jsConfig.FolderAsRule {
+		// add combined "ts_project" rule with js sources
+		generatedTSRules, generatedTSImports := lang.genRules(args, jsConfig, isModule, isJSRoot, pkgName, append(tsSources, jsSources...), false, "ts_project")
+		generatedRules = append(generatedRules, generatedTSRules...)
+		generatedImports = append(generatedImports, generatedTSImports...)
+
+	} else {
+		// add "ts_project" rule(s)
+		generatedTSRules, generatedTSImports := lang.genRules(args, jsConfig, isModule, isJSRoot, pkgName, tsSources, appendTSExt, "ts_project")
+		generatedRules = append(generatedRules, generatedTSRules...)
+		generatedImports = append(generatedImports, generatedTSImports...)
+
+		// add "js_library" rule(s)
+		appendTSExt = false
+		generatedJSRules, generatedJSImports := lang.genRules(args, jsConfig, isModule, isJSRoot, pkgName, jsSources, appendTSExt, "js_library")
+		generatedRules = append(generatedRules, generatedJSRules...)
+		generatedImports = append(generatedImports, generatedJSImports...)
+	}
 
 	// add "web_asset" rule(s)
 	generatedWARules, generatedWAImports := lang.genWebAssets(args, webAssetsSet, jsConfig)
@@ -155,39 +174,35 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 	}
 }
 
-func (lang *JS) readFiles(args language.GenerateArgs, jsConfig *JsConfig) (map[string]bool, []string, []imports, []string, []imports, []*rule.Rule, []interface{}, bool, bool) {
+func (lang *JS) collectSources(args language.GenerateArgs, jsConfig *JsConfig) ([]string, []string, []string, []string, map[string]bool, bool, bool) {
+
 	managedFiles := make(map[string]bool)
-	webAssetsSet := make(map[string]bool)
-
+	tsdSources := []string{}
+	jestSources := []string{}
 	tsSources := []string{}
-	tsImports := []imports{}
 	jsSources := []string{}
-	jsImports := []imports{}
-
-	generatedRules := make([]*rule.Rule, 0)
-	generatedImports := make([]interface{}, 0)
+	webAssetsSet := make(map[string]bool)
 
 	isModule := false
 
 	absJSRoot, _ := filepath.Abs(jsConfig.JSRoot)
 	isJSRoot := absJSRoot == args.Dir
 
-	for _, baseName := range args.RegularFiles {
-		managedFiles[baseName] = true
+	for _, baseName := range lang.gatherFiles(args, jsConfig) {
 
-		filePath := path.Join(args.Dir, baseName)
+		managedFiles[baseName] = true
 
 		// TS DEFINITIONS ".d.ts"
 		match := tsDefsExtensionsPattern.FindStringSubmatch(baseName)
 		if len(match) > 0 {
-			generatedRules, generatedImports = lang.genTSDefinition(args, baseName, match, jsConfig, generatedRules, generatedImports)
+			tsdSources = append(tsdSources, baseName)
 			continue
 		}
 
 		// TS & JS TEST
 		match = append(jsTestExtensionsPattern.FindStringSubmatch(baseName), tsTestExtensionsPattern.FindStringSubmatch(baseName)...)
 		if len(match) > 0 {
-			generatedRules, generatedImports = lang.genJestTest(args, match, filePath, baseName, jsConfig, generatedRules, generatedImports)
+			jestSources = append(jestSources, baseName)
 			continue
 		}
 
@@ -200,14 +215,12 @@ func (lang *JS) readFiles(args language.GenerateArgs, jsConfig *JsConfig) (map[s
 		match = tsExtensionsPattern.FindStringSubmatch(baseName)
 		if len(match) > 0 {
 			tsSources = append(tsSources, baseName)
-			tsImports = append(tsImports, *readFileAndParse(filePath))
 			continue
 		}
 		// JS
 		match = jsExtensionsPattern.FindStringSubmatch(baseName)
 		if len(match) > 0 {
 			jsSources = append(jsSources, baseName)
-			jsImports = append(jsImports, *readFileAndParse(filePath))
 			continue
 		}
 
@@ -220,10 +233,35 @@ func (lang *JS) readFiles(args language.GenerateArgs, jsConfig *JsConfig) (map[s
 		}
 
 	}
-	return webAssetsSet, tsSources, tsImports, jsSources, jsImports, generatedRules, generatedImports, isModule, isJSRoot
+
+	return tsdSources,
+		jestSources,
+		tsSources,
+		jsSources,
+		webAssetsSet,
+		isModule,
+		isJSRoot
 }
 
-func readFileAndParse(filePath string) *imports {
+func (lang *JS) gatherFiles(args language.GenerateArgs, jsConfig *JsConfig) []string {
+	allFiles := args.RegularFiles
+	if jsConfig.FolderAsRule {
+		for _, subDir := range args.Subdirs {
+			relDir := path.Join(args.Dir, subDir)
+			filepath.Walk(relDir, func(path string, info fs.FileInfo, err error) error {
+				if info != nil && !info.IsDir() {
+					allFiles = append(allFiles,
+						strings.TrimPrefix(strings.TrimPrefix(path, args.Dir), "/"),
+					)
+				}
+				return nil
+			})
+		}
+	}
+	return allFiles
+}
+
+func readFileAndParse(filePath string, rel string) *imports {
 
 	fileImports := imports{
 		set: make(map[string]bool),
@@ -244,33 +282,94 @@ func readFileAndParse(filePath string) *imports {
 		log.Fatalf(Err("Error parsing %s: %v", filePath, err))
 	}
 	for _, imp := range jsImports {
+		if rel != "" && strings.HasPrefix(imp, ".") {
+			imp = path.Join(rel, imp)
+		}
 		fileImports.set[imp] = true
 	}
 
 	return &fileImports
 }
 
-func (lang *JS) genTSDefinition(args language.GenerateArgs, baseName string, match []string, jsConfig *JsConfig, generatedRules []*rule.Rule, generatedImports []interface{}) ([]*rule.Rule, []interface{}) {
-	r := rule.NewRule(getKind(args.Config, "ts_definition"), strings.TrimSuffix(baseName, match[0])+".d")
-	r.SetAttr("srcs", []string{baseName})
-	if len(jsConfig.Visibility.Labels) > 0 {
-		r.SetAttr("visibility", jsConfig.Visibility.Labels)
+func (lang *JS) genTSDefinition(args language.GenerateArgs, jsConfig *JsConfig, tsdSources []string) ([]*rule.Rule, []interface{}) {
+	generatedRules := make([]*rule.Rule, 0)
+	generatedImports := make([]interface{}, 0)
+
+	for _, baseName := range tsdSources {
+		match := tsDefsExtensionsPattern.FindStringSubmatch(baseName)
+		r := rule.NewRule(getKind(args.Config, "ts_definition"), strings.TrimSuffix(baseName, match[0])+".d")
+		r.SetAttr("srcs", []string{baseName})
+		if len(jsConfig.Visibility.Labels) > 0 {
+			r.SetAttr("visibility", jsConfig.Visibility.Labels)
+		}
+		generatedRules = append(generatedRules, r)
+		generatedImports = append(generatedImports, &noImports)
 	}
 
-	generatedRules = append(generatedRules, r)
-	generatedImports = append(generatedImports, &noImports)
 	return generatedRules, generatedImports
 }
 
-func (lang *JS) genJestTest(args language.GenerateArgs, match []string, filePath string, baseName string, jsConfig *JsConfig, generatedRules []*rule.Rule, generatedImports []interface{}) ([]*rule.Rule, []interface{}) {
-	i, r := lang.makeTestRule(testRuleArgs{
-		ruleType:  getKind(args.Config, "jest_test"),
-		extension: match[0],
-		filePath:  filePath,
-		baseName:  baseName,
-	}, jsConfig)
-	generatedRules = append(generatedRules, r)
-	generatedImports = append(generatedImports, i)
+func (lang *JS) genJestTest(args language.GenerateArgs, jsConfig *JsConfig, jestSources []string) ([]*rule.Rule, []interface{}) {
+	generatedRules := make([]*rule.Rule, 0)
+	generatedImports := make([]interface{}, 0)
+
+	if !jsConfig.FolderAsRule {
+		// Add each test as an individual rule
+		for _, baseName := range jestSources {
+			match := append(jsTestExtensionsPattern.FindStringSubmatch(baseName), tsTestExtensionsPattern.FindStringSubmatch(baseName)...)
+			filePath := path.Join(args.Dir, baseName)
+			extension := match[0]
+
+			r := rule.NewRule(
+				getKind(args.Config, "jest_test"),
+				strings.TrimSuffix(baseName, extension)+".test",
+			)
+			r.SetAttr("srcs", []string{baseName})
+			if jsConfig.TestSize != "" {
+				r.SetAttr("size", jsConfig.TestSize)
+			}
+			if len(jsConfig.Visibility.Labels) > 0 {
+				r.SetAttr("visibility", jsConfig.Visibility.Labels)
+			}
+
+			imports := readFileAndParse(filePath, "")
+
+			generatedRules = append(generatedRules, r)
+			generatedImports = append(generatedImports, imports)
+		}
+
+	} else if len(jestSources) > 0 {
+		// Add all tests as a single rule
+		var allImports []imports
+		for _, baseName := range jestSources {
+			filePath := path.Join(args.Dir, baseName)
+			relativePart := path.Dir(baseName)
+			allImports = append(allImports, *readFileAndParse(filePath, relativePart))
+		}
+		imports := flattenImports(allImports)
+
+		pkgName := PkgName(args.Rel)
+		ruleName := fmt.Sprintf("%s_test", pkgName)
+		r := rule.NewRule(
+			getKind(args.Config, "jest_test"),
+			ruleName,
+		)
+
+		r.SetAttr("srcs", jestSources)
+		if jsConfig.TestShards > 0 {
+			r.SetAttr("shard_count", jsConfig.TestShards)
+		}
+		if jsConfig.TestSize != "" {
+			r.SetAttr("size", jsConfig.TestSize)
+		}
+		if len(jsConfig.Visibility.Labels) > 0 {
+			r.SetAttr("visibility", jsConfig.Visibility.Labels)
+		}
+
+		generatedRules = append(generatedRules, r)
+		generatedImports = append(generatedImports, imports)
+	}
+
 	return generatedRules, generatedImports
 }
 
@@ -281,8 +380,8 @@ type testRuleArgs struct {
 	baseName  string
 }
 
-func (lang *JS) makeTestRule(args testRuleArgs, jsConfig *JsConfig) (*imports, *rule.Rule) {
-	imps := readFileAndParse(args.filePath)
+func (lang *JS) makeFolderTestRule(args testRuleArgs, jsConfig *JsConfig) (*imports, *rule.Rule) {
+	imps := readFileAndParse(args.filePath, "")
 	ruleName := strings.TrimSuffix(args.baseName, args.extension) + ".test"
 	r := rule.NewRule(args.ruleType, ruleName)
 	r.SetAttr("srcs", []string{args.baseName})
@@ -292,24 +391,49 @@ func (lang *JS) makeTestRule(args testRuleArgs, jsConfig *JsConfig) (*imports, *
 	return imps, r
 }
 
-func (lang *JS) genRules(args language.GenerateArgs, jsConfig *JsConfig, aggregateModule bool, pkgName string, kindSources []string, kindImports []imports, appendTS bool, kind string) ([]*rule.Rule, []interface{}) {
+func (lang *JS) genRules(args language.GenerateArgs, jsConfig *JsConfig, isModule bool, isJSRoot bool, pkgName string, sources []string, appendTSExt bool, kind string) ([]*rule.Rule, []interface{}) {
+
+	// Parse files to get imports
+	var imports []imports
+	for _, baseName := range sources {
+		filePath := path.Join(args.Dir, baseName)
+		relativePart := ""
+		if jsConfig.FolderAsRule {
+			relativePart = path.Dir(baseName)
+		}
+		imports = append(imports, *readFileAndParse(filePath, relativePart))
+	}
+
+	aggregateModule := jsConfig.AggregateModules && isModule && !isJSRoot
 
 	generatedRules := make([]*rule.Rule, 0)
 	generatedImports := make([]interface{}, 0)
 
-	if len(kindSources) > 0 {
+	if len(sources) > 0 {
 		name := pkgName
-		if appendTS {
+		if appendTSExt {
 			name = name + ".ts"
 		}
-		if aggregateModule {
-			// add as a module
+		if jsConfig.FolderAsRule {
+			// add as a folder
+			folderImports, folderRule := lang.makeFolderRule(moduleRuleArgs{
+				pkgName:  name,
+				cwd:      args.Rel,
+				ruleType: getKind(args.Config, kind),
+				srcs:     sources,
+				imports:  imports,
+			}, jsConfig)
+			generatedRules = append(generatedRules, folderRule)
+			generatedImports = append(generatedImports, folderImports)
+
+		} else if aggregateModule {
+			// add as a module (barrel file)
 			moduleImports, moduleRules := lang.makeModuleRules(moduleRuleArgs{
 				pkgName:  name,
 				cwd:      args.Rel,
 				ruleType: getKind(args.Config, kind),
-				srcs:     kindSources,
-				imports:  kindImports,
+				srcs:     sources,
+				imports:  imports,
 			}, jsConfig)
 			if !jsConfig.Quiet && len(moduleRules) > 1 {
 				log.Print(Warn("[WARN] disjoint module %s", args.Rel))
@@ -322,12 +446,12 @@ func (lang *JS) genRules(args language.GenerateArgs, jsConfig *JsConfig, aggrega
 			// add as singletons
 			singletonRules := lang.makeRules(ruleArgs{
 				ruleType: getKind(args.Config, kind),
-				srcs:     kindSources,
+				srcs:     sources,
 				trimExt:  true,
 			}, jsConfig)
 			for i := range singletonRules {
 				generatedRules = append(generatedRules, singletonRules[i])
-				generatedImports = append(generatedImports, &kindImports[i])
+				generatedImports = append(generatedImports, &imports[i])
 			}
 		}
 	}
@@ -422,7 +546,7 @@ func (lang *JS) makeModuleRules(args moduleRuleArgs, jsConfig *JsConfig) ([]*imp
 		moduleSrcs = append(moduleSrcs, src)
 		moduleImportsList = append(moduleImportsList, imports)
 	}
-	moduleImports := aggregateImports(moduleImportsList)
+	moduleImports := flattenImports(moduleImportsList)
 
 	// Use lists to make a rule
 	moduleRule := rule.NewRule(args.ruleType, args.pkgName)
@@ -470,6 +594,21 @@ func (lang *JS) makeModuleRules(args moduleRuleArgs, jsConfig *JsConfig) ([]*imp
 	return allImports, allRules
 }
 
+func (lang *JS) makeFolderRule(args moduleRuleArgs, jsConfig *JsConfig) (*imports, *rule.Rule) {
+
+	moduleImports := flattenImports(args.imports)
+
+	// Use lists to make a rule
+	moduleRule := rule.NewRule(args.ruleType, args.pkgName)
+	moduleRule.SetAttr("srcs", args.srcs)
+	if len(jsConfig.Visibility.Labels) > 0 {
+		moduleRule.SetAttr("visibility", jsConfig.Visibility.Labels)
+	}
+	moduleRule.SetAttr("tags", []string{"js_folder"})
+
+	return moduleImports, moduleRule
+}
+
 func isLocalImport(cwd string, path string) bool {
 
 	// Special case for dot prefix without a folder
@@ -492,7 +631,7 @@ func isLocalImport(cwd string, path string) bool {
 	return true
 }
 
-func aggregateImports(imps []imports) *imports {
+func flattenImports(imps []imports) *imports {
 
 	aggregatedImports := imports{
 		set: make(map[string]bool),
