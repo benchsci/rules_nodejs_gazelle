@@ -20,8 +20,8 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
+	"os"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -71,6 +71,9 @@ type JsConfig struct {
 	Quiet              bool
 	Verbose            bool
 	NpmLabel           string
+	FolderAsRule       bool
+	TestShards         int
+	TestSize           string
 }
 
 func NewJsConfig() *JsConfig {
@@ -93,6 +96,8 @@ func NewJsConfig() *JsConfig {
 		AggregateWebAssets: false,
 		AggregateAllAssets: false,
 		AggregatedAssets:   make(map[string]bool),
+		FolderAsRule:       false,
+		TestShards:         -1,
 		Fix:                false,
 		JSRoot:             "/",
 		WebAssetSuffixes:   make(map[string]bool),
@@ -108,7 +113,9 @@ func (parent *JsConfig) NewChild() *JsConfig {
 
 	child := NewJsConfig()
 
-	child.Enabled = parent.Enabled
+	child.FolderAsRule = false
+	child.Enabled = parent.Enabled && !parent.FolderAsRule
+
 	child.PackageFile = parent.PackageFile
 	child.NpmDependencies = parent.NpmDependencies // This is treated immutably
 	child.LookupTypes = parent.LookupTypes
@@ -127,6 +134,10 @@ func (parent *JsConfig) NewChild() *JsConfig {
 	child.AggregateWebAssets = parent.AggregateWebAssets
 	child.AggregateAllAssets = parent.AggregateAllAssets
 	child.AggregatedAssets = parent.AggregatedAssets // Reinitialized on change to JSRoot
+
+	child.TestShards = parent.TestShards
+	child.TestSize = parent.TestSize
+
 	child.JSRoot = parent.JSRoot
 	child.WebAssetSuffixes = make(map[string]bool) // copy map
 	for k, v := range parent.WebAssetSuffixes {
@@ -180,6 +191,9 @@ func (*JS) KnownDirectives() []string {
 		"js_aggregate_modules",
 		"js_aggregate_web_assets",
 		"js_aggregate_all_assets",
+		"js_folder_as_rule",
+		"js_test_shard_count",
+		"js_test_size",
 		"js_web_asset",
 		"js_quiet",
 		"js_verbose",
@@ -245,7 +259,7 @@ func (*JS) Configure(c *config.Config, rel string, f *rule.File) {
 			case "js_package_file":
 				jsConfig.PackageFile = directive.Value
 
-				data, err := ioutil.ReadFile(path.Join(c.RepoRoot, f.Pkg, jsConfig.PackageFile))
+				data, err := os.ReadFile(path.Join(c.RepoRoot, f.Pkg, jsConfig.PackageFile))
 				if err != nil {
 					log.Fatalf(Err("failed to open %s: %v", directive.Value, err))
 				}
@@ -300,6 +314,15 @@ func (*JS) Configure(c *config.Config, rel string, f *rule.File) {
 
 			case "js_aggregate_all_assets":
 				jsConfig.AggregateAllAssets = readBoolDirective(directive)
+
+			case "js_folder_as_rule":
+				jsConfig.FolderAsRule = readBoolDirective(directive)
+
+			case "js_test_shard_count":
+				jsConfig.TestShards = readIntDirective(directive)
+
+			case "js_test_size":
+				jsConfig.TestSize = directive.Value
 
 			case "js_web_asset":
 				vals := strings.SplitN(directive.Value, " ", 2)
@@ -424,5 +447,17 @@ func readBoolDirective(directive rule.Directive) bool {
 			log.Fatalf(Err("failed to read directive %s: %v", directive.Key, err))
 		}
 		return val
+	}
+}
+
+func readIntDirective(directive rule.Directive) int {
+	if directive.Value == "" {
+		return -1
+	} else {
+		val, err := strconv.ParseInt(directive.Value, 10, 32)
+		if err != nil {
+			log.Fatalf(Err("failed to read directive %s: %v", directive.Key, err))
+		}
+		return int(val)
 	}
 }

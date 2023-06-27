@@ -41,7 +41,7 @@ import (
 const (
 	extensionDir      = "gazelle/"
 	testDataPath      = extensionDir + "testdata/"
-	gazelleBinaryName = "gazelle_bin"
+	gazelleBinaryName = "test_gazelle_bin"
 )
 
 var gazellePath = mustFindGazelle()
@@ -151,7 +151,7 @@ func testPath(t *testing.T, name string, files []bazel.RunfileEntry) {
 		args := []string{"-build_file_name=BUILD,BUILD.bazel"}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()		
+		defer cancel()
 		cmd := exec.CommandContext(ctx, gazellePath, args...)
 		var stdout, stderr bytes.Buffer
 		cmd.Stdout = &stdout
