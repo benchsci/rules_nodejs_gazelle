@@ -82,7 +82,7 @@ This means, for example, if you set `# gazelle:prefix` in the build file
 in your project's root directory, it affects your whole project. If you
 set it in a subdirectory, it only affects rules in that subtree.
 
-Example of most of these directives can be found in [gazelle/testdata](gazelle/testdata)
+Example of most of these directives can be found in [examples](examples)
 
 The following directives are recognized by this plugin:
 
@@ -149,6 +149,14 @@ The following directives are recognized by this plugin:
   </tr>
   <tr>
     <td colspan="2"><p dir="auto">Specifies the current package (folder) as a JS root. Imports for JS and TS consider this folder the root level for relative and absolute imports. This is used on monorepos with multiple Python projects that don't share the top-level of the workspace as the root.</p></td>
+  </tr>
+
+  <tr>
+    <td><code># gazelle:js_folder_as_rule</code></td>
+    <td><code>none</code></td>
+  </tr>
+  <tr>
+    <td colspan="2"><p dir="auto">Stops recursion into subdirectories of the folder containing the directive, and collects all sources and tests into a single rule. Use this to reduce rule count for large repositories. See <code>examples/folder_rules</code> for usage.</p></td>
   </tr>
 
   <tr>
