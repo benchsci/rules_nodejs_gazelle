@@ -1,0 +1,35 @@
+load("@aspect_rules_js//js:defs.bzl", "js_library")
+load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
+
+# gazelle:js_root
+# gazelle:js_web_asset json
+# gazelle:js_package_file package.json :node_modules
+
+js_library(
+    name = "package_json",
+    srcs = ["package.json"],
+)
+
+ts_project(
+    name = "a",
+    srcs = ["a.ts"],
+    deps = [
+        ":b",
+        ":c",
+    ],
+)
+
+ts_project(
+    name = "b",
+    srcs = ["b.ts"],
+)
+
+ts_project(
+    name = "c",
+    srcs = ["c.ts"],
+)
+
+ts_project(
+    name = "d",
+    srcs = ["d.ts"],
+)

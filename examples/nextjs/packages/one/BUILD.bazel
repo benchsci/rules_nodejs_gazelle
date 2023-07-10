@@ -1,0 +1,42 @@
+load("@aspect_rules_js//js:defs.bzl", "js_library")
+load("//bazel:ts_project.bzl", "ts_project")
+load("@aspect_rules_js//npm:defs.bzl", "npm_package")
+load("@npm//:defs.bzl", "npm_link_all_packages")
+
+# gazelle:js_collect_all
+
+# gazelle:js_package_file package.json :node_modules
+# gazelle:js_root
+
+# gazelle:js_visibility //packages/one:__subpackages__
+
+npm_link_all_packages(name = "node_modules")
+
+# make this library available via node_modules
+npm_package(
+    name = "one",
+    srcs = [
+        ":one_ts",
+        ":package_json",
+    ],
+    # This is a perf improvement; the default will be flipped to False in rules_js 2.0
+    # include_runfiles = False,
+    visibility = ["//visibility:public"],
+)
+
+ts_project(
+    name = "one_ts",
+    srcs = ["src/main.ts"],
+    data = ["//packages/one:node_modules/is-odd"],
+    visibility = ["//packages/one:__subpackages__"],
+    deps = [
+        "//packages/one:node_modules/@types/is-odd",
+        "//packages/one:node_modules/is-odd",
+    ],
+)
+
+js_library(
+    name = "package_json",
+    srcs = ["package.json"],
+    visibility = ["//packages/one:__subpackages__"],
+)

@@ -1,0 +1,15 @@
+load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
+
+ts_project(
+    name = "my_module",
+    srcs = [
+        "index.ts",
+        "module_file.ts",
+    ],
+    tags = ["js_barrel"],
+)
+
+ts_project(
+    name = "some_other_file",
+    srcs = ["some_other_file.ts"],
+)

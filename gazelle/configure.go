@@ -30,6 +30,7 @@ import (
 
 	"github.com/bazelbuild/bazel-gazelle/config"
 	"github.com/bazelbuild/bazel-gazelle/rule"
+	"github.com/bazelbuild/buildtools/labels"
 )
 
 // Configs is an extension of map[string]*Config. It provides finding methods
@@ -61,19 +62,20 @@ type JsConfig struct {
 	ImportAliases      map[string]string
 	ImportAliasPattern *regexp.Regexp
 	Visibility         Visibility
-	AggregateModules   bool
-	AggregateWebAssets bool
-	AggregateAllAssets bool
-	AggregatedAssets   map[string]bool
+	CollectBarrels     bool
+	CollectWebAssets   bool
+	CollectAllAssets   bool
+	CollectedAssets    map[string]bool
 	Fix                bool
 	JSRoot             string
 	WebAssetSuffixes   map[string]bool
 	Quiet              bool
 	Verbose            bool
-	NpmLabel           string
-	FolderAsRule       bool
-	TestShards         int
-	TestSize           string
+	DefaultNpmLabel    string
+	CollectAll         bool
+	JestConfig         string
+	JestShards         int
+	JestSize           string
 }
 
 func NewJsConfig() *JsConfig {
@@ -87,23 +89,25 @@ func NewJsConfig() *JsConfig {
 			Dependencies:    make(map[string]string),
 			DevDependencies: make(map[string]string),
 		},
+		LookupTypes:        true,
 		ImportAliases:      make(map[string]string),
 		ImportAliasPattern: regexp.MustCompile("$^"),
 		Visibility: Visibility{
 			Labels: []string{},
 		},
-		AggregateModules:   false,
-		AggregateWebAssets: false,
-		AggregateAllAssets: false,
-		AggregatedAssets:   make(map[string]bool),
-		FolderAsRule:       false,
-		TestShards:         -1,
-		Fix:                false,
-		JSRoot:             "/",
-		WebAssetSuffixes:   make(map[string]bool),
-		Quiet:              false,
-		Verbose:            false,
-		NpmLabel:           "@npm//",
+		CollectBarrels:   false,
+		CollectWebAssets: false,
+		CollectAllAssets: false,
+		CollectedAssets:  make(map[string]bool),
+		CollectAll:       false,
+		Fix:              false,
+		JSRoot:           "/",
+		WebAssetSuffixes: make(map[string]bool),
+		Quiet:            false,
+		Verbose:          false,
+		DefaultNpmLabel:  "//:node_modules/",
+		JestShards:       -1,
+		JestConfig:       "",
 	}
 }
 
@@ -113,11 +117,26 @@ func (parent *JsConfig) NewChild() *JsConfig {
 
 	child := NewJsConfig()
 
-	child.FolderAsRule = false
-	child.Enabled = parent.Enabled && !parent.FolderAsRule
+	child.CollectAll = false
+	child.Enabled = parent.Enabled && !parent.CollectAll
 
 	child.PackageFile = parent.PackageFile
-	child.NpmDependencies = parent.NpmDependencies // This is treated immutably
+
+	// copy maps
+	child.NpmDependencies = struct {
+		Dependencies    map[string]string "json:\"dependencies\""
+		DevDependencies map[string]string "json:\"devDependencies\""
+	}{
+		Dependencies:    make(map[string]string),
+		DevDependencies: make(map[string]string),
+	}
+	for k, v := range parent.NpmDependencies.Dependencies {
+		child.NpmDependencies.Dependencies[k] = v
+	}
+	for k, v := range parent.NpmDependencies.DevDependencies {
+		child.NpmDependencies.DevDependencies[k] = v
+	}
+
 	child.LookupTypes = parent.LookupTypes
 	child.ImportAliases = make(map[string]string) // copy map
 	for k, v := range parent.ImportAliases {
@@ -130,13 +149,14 @@ func (parent *JsConfig) NewChild() *JsConfig {
 	for i := range parent.Visibility.Labels {
 		child.Visibility.Labels[i] = parent.Visibility.Labels[i]
 	}
-	child.AggregateModules = parent.AggregateModules
-	child.AggregateWebAssets = parent.AggregateWebAssets
-	child.AggregateAllAssets = parent.AggregateAllAssets
-	child.AggregatedAssets = parent.AggregatedAssets // Reinitialized on change to JSRoot
+	child.CollectBarrels = parent.CollectBarrels
+	child.CollectWebAssets = parent.CollectWebAssets
+	child.CollectAllAssets = parent.CollectAllAssets
+	child.CollectedAssets = parent.CollectedAssets // Reinitialized on change to JSRoot
 
-	child.TestShards = parent.TestShards
-	child.TestSize = parent.TestSize
+	child.JestShards = parent.JestShards
+	child.JestSize = parent.JestSize
+	child.JestConfig = parent.JestConfig
 
 	child.JSRoot = parent.JSRoot
 	child.WebAssetSuffixes = make(map[string]bool) // copy map
@@ -145,7 +165,7 @@ func (parent *JsConfig) NewChild() *JsConfig {
 	}
 	child.Quiet = parent.Quiet
 	child.Verbose = parent.Verbose
-	child.NpmLabel = parent.NpmLabel
+	child.DefaultNpmLabel = parent.DefaultNpmLabel
 
 	return child
 }
@@ -177,7 +197,7 @@ func (lang *JS) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 }
 
 // KnownDirectives returns a list of directive keys that this Configurer can
-// interpret. Gazelle prints errors for directives that are not recoginized by
+// interpret. Gazelle prints errors for directives that are not recognized by
 // any Configurer.
 func (*JS) KnownDirectives() []string {
 	return []string{
@@ -188,16 +208,20 @@ func (*JS) KnownDirectives() []string {
 		"js_package_file",
 		"js_import_alias",
 		"js_visibility",
+		"js_collect_barrels",
 		"js_aggregate_modules",
+		"js_collect_web_assets",
 		"js_aggregate_web_assets",
+		"js_collect_all_assets",
 		"js_aggregate_all_assets",
-		"js_folder_as_rule",
-		"js_test_shard_count",
-		"js_test_size",
+		"js_collect_all",
+		"js_jest_shard_count",
+		"js_jest_size",
+		"js_jest_config",
 		"js_web_asset",
 		"js_quiet",
 		"js_verbose",
-		"npm_label",
+		"js_default_npm_label",
 	}
 }
 
@@ -218,7 +242,7 @@ func (*JS) Configure(c *config.Config, rel string, f *rule.File) {
 	if _, exists := c.Exts[languageName]; !exists {
 		rootConfig := NewJsConfig()
 		rootConfig.JSRoot = "."
-		rootConfig.AggregatedAssets = make(map[string]bool)
+		rootConfig.CollectedAssets = make(map[string]bool)
 		c.Exts[languageName] = JsConfigs{
 			"": rootConfig,
 		}
@@ -257,24 +281,42 @@ func (*JS) Configure(c *config.Config, rel string, f *rule.File) {
 				jsConfig.Fix = readBoolDirective(directive)
 
 			case "js_package_file":
-				jsConfig.PackageFile = directive.Value
+				values := strings.Split(directive.Value, " ")
+				if len(values) != 2 {
+					log.Fatalf(Err("failed to read directive %s: %s, expected 2 values", directive.Key, directive.Value))
+				}
+				jsConfig.PackageFile = values[0]
+				npmLabel := values[1]
+				if strings.HasPrefix(npmLabel, ":") {
+					npmLabel = labels.ParseRelative(npmLabel, f.Pkg).Format()
+				}
+				if !strings.HasSuffix(npmLabel, ":") && !strings.HasSuffix(npmLabel, "/") {
+					npmLabel += "/"
+				}
 
 				data, err := os.ReadFile(path.Join(c.RepoRoot, f.Pkg, jsConfig.PackageFile))
 				if err != nil {
 					log.Fatalf(Err("failed to open %s: %v", directive.Value, err))
 				}
 
-				// Clear any existing dependencies
-				for k := range jsConfig.NpmDependencies.Dependencies {
-					delete(jsConfig.NpmDependencies.Dependencies, k)
+				// Read dependencies from file
+				newDeps := struct {
+					Dependencies    map[string]string "json:\"dependencies\""
+					DevDependencies map[string]string "json:\"devDependencies\""
+				}{
+					Dependencies:    make(map[string]string),
+					DevDependencies: make(map[string]string),
 				}
-				for k := range jsConfig.NpmDependencies.DevDependencies {
-					delete(jsConfig.NpmDependencies.DevDependencies, k)
+				if err := json.Unmarshal(data, &newDeps); err != nil {
+					log.Fatalf(Err("failed to parse %s: %v", directive.Value, err))
 				}
 
-				// Read dependencies from file
-				if err := json.Unmarshal(data, &jsConfig.NpmDependencies); err != nil {
-					log.Fatalf(Err("failed to parse %s: %v", directive.Value, err))
+				// Store npmLabel in dependencies
+				for k, _ := range newDeps.Dependencies {
+					jsConfig.NpmDependencies.Dependencies[k] = npmLabel
+				}
+				for k, _ := range newDeps.DevDependencies {
+					jsConfig.NpmDependencies.DevDependencies[k] = npmLabel
 				}
 
 			case "js_import_alias":
@@ -294,8 +336,11 @@ func (*JS) Configure(c *config.Config, rel string, f *rule.File) {
 
 			case "js_visibility":
 				jsConfig.Visibility.Set(directive.Value)
-			case "npm_label":
-				jsConfig.NpmLabel = directive.Value
+			case "js_default_npm_label":
+				jsConfig.DefaultNpmLabel = directive.Value
+				if !strings.HasSuffix(jsConfig.DefaultNpmLabel, ":") && !strings.HasSuffix(jsConfig.DefaultNpmLabel, "/") {
+					jsConfig.DefaultNpmLabel += "/"
+				}
 
 			case "js_root":
 				jSRoot, err := filepath.Rel(".", f.Pkg)
@@ -303,26 +348,38 @@ func (*JS) Configure(c *config.Config, rel string, f *rule.File) {
 					log.Fatalf(Err("failed to read directive %s: %v", directive.Key, err))
 				} else {
 					jsConfig.JSRoot = jSRoot
-					jsConfig.AggregatedAssets = make(map[string]bool)
+					jsConfig.CollectedAssets = make(map[string]bool)
 				}
 
+			case "js_collect_barrels":
+				jsConfig.CollectBarrels = readBoolDirective(directive)
+
 			case "js_aggregate_modules":
-				jsConfig.AggregateModules = readBoolDirective(directive)
+				jsConfig.CollectBarrels = readBoolDirective(directive)
+
+			case "js_collect_web_assets":
+				jsConfig.CollectWebAssets = readBoolDirective(directive)
 
 			case "js_aggregate_web_assets":
-				jsConfig.AggregateWebAssets = readBoolDirective(directive)
+				jsConfig.CollectWebAssets = readBoolDirective(directive)
+
+			case "js_collect_all_assets":
+				jsConfig.CollectAllAssets = readBoolDirective(directive)
 
 			case "js_aggregate_all_assets":
-				jsConfig.AggregateAllAssets = readBoolDirective(directive)
+				jsConfig.CollectAllAssets = readBoolDirective(directive)
 
-			case "js_folder_as_rule":
-				jsConfig.FolderAsRule = readBoolDirective(directive)
+			case "js_collect_all":
+				jsConfig.CollectAll = readBoolDirective(directive)
 
-			case "js_test_shard_count":
-				jsConfig.TestShards = readIntDirective(directive)
+			case "js_jest_config":
+				jsConfig.JestConfig = labels.ParseRelative(directive.Value, f.Pkg).Format()
 
-			case "js_test_size":
-				jsConfig.TestSize = directive.Value
+			case "js_jest_shard_count":
+				jsConfig.JestShards = readIntDirective(directive)
+
+			case "js_jest_size":
+				jsConfig.JestSize = directive.Value
 
 			case "js_web_asset":
 				vals := strings.SplitN(directive.Value, " ", 2)
@@ -430,8 +487,8 @@ func trimExt(baseName string) string {
 	return baseName
 }
 
-func isModuleFile(baseName string) bool {
-	return indexFilePattern.MatchString(baseName)
+func isBarrelFile(baseName string) bool {
+	return indexFilePattern.MatchString(baseName) && !isReactFile(baseName)
 }
 
 func isReactFile(baseName string) bool {

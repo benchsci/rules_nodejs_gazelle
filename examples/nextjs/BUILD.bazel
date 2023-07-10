@@ -1,0 +1,53 @@
+load("@aspect_rules_js//js:defs.bzl", "js_library")
+load("@aspect_rules_ts//ts:defs.bzl", "ts_config")
+load("@npm//:defs.bzl", "npm_link_all_packages")
+load("@npm//:next/package_json.bzl", next_bin = "bin")
+load("@bazel_gazelle//:def.bzl", "DEFAULT_LANGUAGES", "gazelle", "gazelle_binary")
+
+# gazelle:exclude .next
+# gazelle:exclude **/node_modules
+# gazelle:exclude .eslintrc.json
+# gazelle:exclude tsconfig.json
+
+# gazelle:js_package_file package.json :node_modules
+# gazelle:js_collect_barrels
+# gazelle:js_web_asset .json,.css,.scss,.svg,.ico
+# gazelle:js_collect_all_assets
+# gazelle:js_root
+
+# gazelle:map_kind jest_test jest_test //bazel:jest_test.bzl
+# gazelle:map_kind ts_project ts_project //bazel:ts_project.bzl
+# gazelle:map_kind web_assets web_assets //bazel:web_assets.bzl
+
+gazelle(
+    name = "gazelle",
+    args = ["-build_file_name=BUILD.bazel"],
+    gazelle = ":gazelle_bin",
+    visibility = ["//visibility:private"],
+)
+
+gazelle_binary(
+    name = "gazelle_bin",
+    languages = DEFAULT_LANGUAGES + [
+        "@com_github_benchsci_rules_nodejs_gazelle//gazelle:gazelle",
+    ],
+    visibility = ["//visibility:private"],
+)
+
+npm_link_all_packages(name = "node_modules")
+
+next_bin.next_binary(
+    name = "next_js_binary",
+    visibility = ["//visibility:public"],
+)
+
+ts_config(
+    name = "tsconfig",
+    src = "tsconfig.json",
+    visibility = ["//visibility:public"],
+)
+
+js_library(
+    name = "package_json",
+    srcs = ["package.json"],
+)

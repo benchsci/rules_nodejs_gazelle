@@ -1,0 +1,2 @@
+# gazelle:js_web_asset json,css,scss
+# gazelle:js_collect_web_assets

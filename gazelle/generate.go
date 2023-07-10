@@ -39,29 +39,36 @@ var noImports = imports{
 	set: map[string]bool{},
 }
 
-var localRules = rule.LoadInfo{
-	Name:    "@com_github_benchsci_rules_nodejs_gazelle//:defs.bzl",
-	Symbols: []string{"web_asset", "web_assets", "js_library", "ts_definition"},
+var jsRules = rule.LoadInfo{
+	Name:    "@aspect_rules_js//js:defs.bzl",
+	Symbols: []string{"js_library"},
 }
 var tsRules = rule.LoadInfo{
-	Name:    "@npm//@bazel/typescript:index.bzl",
+	Name:    "@aspect_rules_ts//ts:defs.bzl",
 	Symbols: []string{"ts_project"},
 }
 var jestRules = rule.LoadInfo{
-	Name:    "@npm//jest:index.bzl",
+	Name:    "@rules_jest//jest:defs.bzl",
 	Symbols: []string{"jest_test"},
+}
+var webAssetRules = rule.LoadInfo{
+	Name:    "@com_github_benchsci_rules_nodejs_gazelle//:defs.bzl",
+	Symbols: []string{"web_assets"},
 }
 var managedRulesSet map[string]bool
 
 func init() {
 	managedRulesSet = make(map[string]bool)
-	for _, rule := range localRules.Symbols {
+	for _, rule := range jsRules.Symbols {
 		managedRulesSet[rule] = true
 	}
 	for _, rule := range tsRules.Symbols {
 		managedRulesSet[rule] = true
 	}
 	for _, rule := range jestRules.Symbols {
+		managedRulesSet[rule] = true
+	}
+	for _, rule := range webAssetRules.Symbols {
 		managedRulesSet[rule] = true
 	}
 }
@@ -71,9 +78,10 @@ func init() {
 // files.
 func (lang *JS) Loads() []rule.LoadInfo {
 	return []rule.LoadInfo{
-		localRules,
+		jsRules,
 		tsRules,
 		jestRules,
+		webAssetRules,
 	}
 }
 
@@ -116,11 +124,18 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		tsSources,
 		jsSources,
 		webAssetsSet,
-		isModule,
+		isBarrel,
 		isJSRoot = lang.collectSources(args, jsConfig)
 
-	if isModule && len(tsSources) > 0 && len(jsSources) > 0 {
-		log.Print(Warn("[WARN] ts and js files mixed in module %s", pkgName))
+	if !jsConfig.Quiet && isBarrel && len(tsSources) > 0 && len(jsSources) > 0 {
+		log.Print(Warn("[WARN] ts and js files mixed in package %s", pkgName))
+	}
+
+	// add "js_library" rule for package.json
+	generatedPkgRule := lang.genPkgRule(args, jsConfig)
+	if generatedPkgRule != nil {
+		generatedRules = append(generatedRules, generatedPkgRule)
+		generatedImports = append(generatedImports, &noImports)
 	}
 
 	// add "ts_definition" rule(s)
@@ -135,26 +150,26 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 
 	appendTSExt := len(jsSources) > 0
 
-	if len(jsSources) > 0 && jsConfig.FolderAsRule {
+	if len(jsSources) > 0 && jsConfig.CollectAll {
 		// add combined "ts_project" rule with js sources
-		generatedTSRules, generatedTSImports := lang.genRules(args, jsConfig, isModule, isJSRoot, pkgName, append(tsSources, jsSources...), false, "ts_project")
+		generatedTSRules, generatedTSImports := lang.genRules(args, jsConfig, isBarrel, isJSRoot, pkgName, append(tsSources, jsSources...), false, "ts_project")
 		generatedRules = append(generatedRules, generatedTSRules...)
 		generatedImports = append(generatedImports, generatedTSImports...)
 
 	} else {
 		// add "ts_project" rule(s)
-		generatedTSRules, generatedTSImports := lang.genRules(args, jsConfig, isModule, isJSRoot, pkgName, tsSources, appendTSExt, "ts_project")
+		generatedTSRules, generatedTSImports := lang.genRules(args, jsConfig, isBarrel, isJSRoot, pkgName, tsSources, appendTSExt, "ts_project")
 		generatedRules = append(generatedRules, generatedTSRules...)
 		generatedImports = append(generatedImports, generatedTSImports...)
 
 		// add "js_library" rule(s)
 		appendTSExt = false
-		generatedJSRules, generatedJSImports := lang.genRules(args, jsConfig, isModule, isJSRoot, pkgName, jsSources, appendTSExt, "js_library")
+		generatedJSRules, generatedJSImports := lang.genRules(args, jsConfig, isBarrel, isJSRoot, pkgName, jsSources, appendTSExt, "js_library")
 		generatedRules = append(generatedRules, generatedJSRules...)
 		generatedImports = append(generatedImports, generatedJSImports...)
 	}
 
-	// add "web_asset" rule(s)
+	// add "web_assets" rule(s)
 	generatedWARules, generatedWAImports := lang.genWebAssets(args, webAssetsSet, jsConfig)
 	generatedRules = append(generatedRules, generatedWARules...)
 	generatedImports = append(generatedImports, generatedWAImports...)
@@ -164,7 +179,7 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 	generatedRules = append(generatedRules, generatedAWARules...)
 	generatedImports = append(generatedImports, generatedAWAImports...)
 
-	existingRules := lang.readExistingRules(args)
+	existingRules := lang.readExistingRules(args, true)
 	lang.pruneManagedRules(existingRules, generatedRules)
 
 	return language.GenerateResult{
@@ -183,12 +198,22 @@ func (lang *JS) collectSources(args language.GenerateArgs, jsConfig *JsConfig) (
 	jsSources := []string{}
 	webAssetsSet := make(map[string]bool)
 
-	isModule := false
+	isBarrel := false
 
-	absJSRoot, _ := filepath.Abs(jsConfig.JSRoot)
+	absJSRoot := path.Join(args.Config.RepoRoot, jsConfig.JSRoot)
 	isJSRoot := absJSRoot == args.Dir
 
 	for _, baseName := range lang.gatherFiles(args, jsConfig) {
+
+		alwaysIgnoredFiles := map[string]bool{
+			"package.json":        true,
+			"package-lock.json":   true,
+			"pnpm-lock.yaml":      true,
+			"pnpm-workspace.yaml": true,
+		}
+		if _, ignored := alwaysIgnoredFiles[baseName]; ignored {
+			continue
+		}
 
 		managedFiles[baseName] = true
 
@@ -207,8 +232,8 @@ func (lang *JS) collectSources(args language.GenerateArgs, jsConfig *JsConfig) (
 		}
 
 		// if the filename is like index.(jsx) then we assume we found a module
-		if isModuleFile(baseName) {
-			isModule = true
+		if isBarrelFile(baseName) {
+			isBarrel = true
 		}
 
 		// TS
@@ -225,11 +250,8 @@ func (lang *JS) collectSources(args language.GenerateArgs, jsConfig *JsConfig) (
 		}
 
 		// WEB ASSETS
-		for suffix := range jsConfig.WebAssetSuffixes {
-			if strings.HasSuffix(baseName, suffix) {
-				webAssetsSet[baseName] = true
-				continue
-			}
+		if lang.isWebAsset(jsConfig, baseName) {
+			webAssetsSet[baseName] = true
 		}
 
 	}
@@ -239,13 +261,22 @@ func (lang *JS) collectSources(args language.GenerateArgs, jsConfig *JsConfig) (
 		tsSources,
 		jsSources,
 		webAssetsSet,
-		isModule,
+		isBarrel,
 		isJSRoot
+}
+
+func (lang *JS) isWebAsset(jsConfig *JsConfig, baseName string) bool {
+	for suffix := range jsConfig.WebAssetSuffixes {
+		if strings.HasSuffix(baseName, suffix) {
+			return true
+		}
+	}
+	return false
 }
 
 func (lang *JS) gatherFiles(args language.GenerateArgs, jsConfig *JsConfig) []string {
 	allFiles := args.RegularFiles
-	if jsConfig.FolderAsRule {
+	if jsConfig.CollectAll {
 		for _, subDir := range args.Subdirs {
 			relDir := path.Join(args.Dir, subDir)
 			filepath.Walk(relDir, func(path string, info fs.FileInfo, err error) error {
@@ -291,13 +322,27 @@ func readFileAndParse(filePath string, rel string) *imports {
 	return &fileImports
 }
 
+func (lang *JS) genPkgRule(args language.GenerateArgs, jsConfig *JsConfig) *rule.Rule {
+	for _, baseName := range args.RegularFiles {
+		if baseName == "package.json" {
+			r := rule.NewRule(getKind(args.Config, "js_library"), "package_json")
+			r.SetAttr("srcs", []string{baseName})
+			if len(jsConfig.Visibility.Labels) > 0 {
+				r.SetAttr("visibility", jsConfig.Visibility.Labels)
+			}
+			return r
+		}
+	}
+	return nil
+}
+
 func (lang *JS) genTSDefinition(args language.GenerateArgs, jsConfig *JsConfig, tsdSources []string) ([]*rule.Rule, []interface{}) {
 	generatedRules := make([]*rule.Rule, 0)
 	generatedImports := make([]interface{}, 0)
 
 	for _, baseName := range tsdSources {
 		match := tsDefsExtensionsPattern.FindStringSubmatch(baseName)
-		r := rule.NewRule(getKind(args.Config, "ts_definition"), strings.TrimSuffix(baseName, match[0])+".d")
+		r := rule.NewRule(getKind(args.Config, "ts_project"), strings.TrimSuffix(baseName, match[0])+".d")
 		r.SetAttr("srcs", []string{baseName})
 		if len(jsConfig.Visibility.Labels) > 0 {
 			r.SetAttr("visibility", jsConfig.Visibility.Labels)
@@ -313,7 +358,7 @@ func (lang *JS) genJestTest(args language.GenerateArgs, jsConfig *JsConfig, jest
 	generatedRules := make([]*rule.Rule, 0)
 	generatedImports := make([]interface{}, 0)
 
-	if !jsConfig.FolderAsRule {
+	if !jsConfig.CollectAll {
 		// Add each test as an individual rule
 		for _, baseName := range jestSources {
 			match := append(jsTestExtensionsPattern.FindStringSubmatch(baseName), tsTestExtensionsPattern.FindStringSubmatch(baseName)...)
@@ -325,8 +370,13 @@ func (lang *JS) genJestTest(args language.GenerateArgs, jsConfig *JsConfig, jest
 				strings.TrimSuffix(baseName, extension)+".test",
 			)
 			r.SetAttr("srcs", []string{baseName})
-			if jsConfig.TestSize != "" {
-				r.SetAttr("size", jsConfig.TestSize)
+
+			if jsConfig.JestConfig == "" {
+				log.Print(Err("[%s/%s] jest_test missing config, use gazelle:js_jest_config directive", args.Rel, baseName))
+			}
+			r.SetAttr("config", jsConfig.JestConfig)
+			if jsConfig.JestSize != "" {
+				r.SetAttr("size", jsConfig.JestSize)
 			}
 			if len(jsConfig.Visibility.Labels) > 0 {
 				r.SetAttr("visibility", jsConfig.Visibility.Labels)
@@ -356,11 +406,16 @@ func (lang *JS) genJestTest(args language.GenerateArgs, jsConfig *JsConfig, jest
 		)
 
 		r.SetAttr("srcs", jestSources)
-		if jsConfig.TestShards > 0 {
-			r.SetAttr("shard_count", jsConfig.TestShards)
+
+		if jsConfig.JestConfig == "" {
+			log.Print(Err("[%s/%s] jest_test missing config, use gazelle:js_jest_config directive", args.Rel, ruleName))
 		}
-		if jsConfig.TestSize != "" {
-			r.SetAttr("size", jsConfig.TestSize)
+		r.SetAttr("config", jsConfig.JestConfig)
+		if jsConfig.JestShards > 0 {
+			r.SetAttr("shard_count", jsConfig.JestShards)
+		}
+		if jsConfig.JestSize != "" {
+			r.SetAttr("size", jsConfig.JestSize)
 		}
 		if len(jsConfig.Visibility.Labels) > 0 {
 			r.SetAttr("visibility", jsConfig.Visibility.Labels)
@@ -391,20 +446,20 @@ func (lang *JS) makeFolderTestRule(args testRuleArgs, jsConfig *JsConfig) (*impo
 	return imps, r
 }
 
-func (lang *JS) genRules(args language.GenerateArgs, jsConfig *JsConfig, isModule bool, isJSRoot bool, pkgName string, sources []string, appendTSExt bool, kind string) ([]*rule.Rule, []interface{}) {
+func (lang *JS) genRules(args language.GenerateArgs, jsConfig *JsConfig, isBarrel bool, isJSRoot bool, pkgName string, sources []string, appendTSExt bool, kind string) ([]*rule.Rule, []interface{}) {
 
 	// Parse files to get imports
 	var imports []imports
 	for _, baseName := range sources {
 		filePath := path.Join(args.Dir, baseName)
 		relativePart := ""
-		if jsConfig.FolderAsRule {
+		if jsConfig.CollectAll {
 			relativePart = path.Dir(baseName)
 		}
 		imports = append(imports, *readFileAndParse(filePath, relativePart))
 	}
 
-	aggregateModule := jsConfig.AggregateModules && isModule && !isJSRoot
+	collectBarrel := jsConfig.CollectBarrels && isBarrel && !isJSRoot
 
 	generatedRules := make([]*rule.Rule, 0)
 	generatedImports := make([]interface{}, 0)
@@ -412,10 +467,21 @@ func (lang *JS) genRules(args language.GenerateArgs, jsConfig *JsConfig, isModul
 	if len(sources) > 0 {
 		name := pkgName
 		if appendTSExt {
-			name = name + ".ts"
+			name = name + "_ts"
 		}
-		if jsConfig.FolderAsRule {
+		if jsConfig.CollectAll {
 			// add as a folder
+			for _, existingRule := range lang.readExistingRules(args, false) {
+				// Look for existing rules with the same name, but different kind
+				if existingRule.Name() == name && existingRule.Kind() != getKind(args.Config, "ts_project") && existingRule.Kind() != getKind(args.Config, "js_library") {
+					if kind == "ts_project" {
+						name = name + "_ts"
+					} else {
+						name = name + "_js"
+					}
+				}
+			}
+
 			folderImports, folderRule := lang.makeFolderRule(moduleRuleArgs{
 				pkgName:  name,
 				cwd:      args.Rel,
@@ -426,7 +492,7 @@ func (lang *JS) genRules(args language.GenerateArgs, jsConfig *JsConfig, isModul
 			generatedRules = append(generatedRules, folderRule)
 			generatedImports = append(generatedImports, folderImports)
 
-		} else if aggregateModule {
+		} else if collectBarrel {
 			// add as a module (barrel file)
 			moduleImports, moduleRules := lang.makeModuleRules(moduleRuleArgs{
 				pkgName:  name,
@@ -436,7 +502,7 @@ func (lang *JS) genRules(args language.GenerateArgs, jsConfig *JsConfig, isModul
 				imports:  imports,
 			}, jsConfig)
 			if !jsConfig.Quiet && len(moduleRules) > 1 {
-				log.Print(Warn("[WARN] disjoint module %s", args.Rel))
+				log.Print(Warn("[WARN] disjoint barrel %s", args.Rel))
 			}
 			for i := range moduleRules {
 				generatedRules = append(generatedRules, moduleRules[i])
@@ -504,7 +570,7 @@ func (lang *JS) makeModuleRules(args moduleRuleArgs, jsConfig *JsConfig) ([]*imp
 	remainderSet := make(map[string]imports)
 
 	for i, src := range args.srcs {
-		if isModuleFile(src) {
+		if isBarrelFile(src) {
 			moduleSet[src] = args.imports[i]
 			indexKey = src
 		} else {
@@ -554,7 +620,7 @@ func (lang *JS) makeModuleRules(args moduleRuleArgs, jsConfig *JsConfig) ([]*imp
 	if len(jsConfig.Visibility.Labels) > 0 {
 		moduleRule.SetAttr("visibility", jsConfig.Visibility.Labels)
 	}
-	moduleRule.SetAttr("tags", []string{"js_module"})
+	moduleRule.SetAttr("tags", []string{"js_barrel"})
 
 	// Accumulate remainder srcs and imports into lists
 	remainderSrcs := make([]string, 0)
@@ -604,7 +670,6 @@ func (lang *JS) makeFolderRule(args moduleRuleArgs, jsConfig *JsConfig) (*import
 	if len(jsConfig.Visibility.Labels) > 0 {
 		moduleRule.SetAttr("visibility", jsConfig.Visibility.Labels)
 	}
-	moduleRule.SetAttr("tags", []string{"js_folder"})
 
 	return moduleImports, moduleRule
 }
@@ -659,9 +724,9 @@ func (lang *JS) genWebAssets(args language.GenerateArgs, webAssetsSet map[string
 	sort.Strings(webAssets)
 
 	if len(webAssets) > 0 {
-		// Generate web_asset rule(s)
+		// Generate web_assets rule(s)
 
-		if jsConfig.AggregateWebAssets {
+		if jsConfig.CollectWebAssets {
 			// aggregate rule
 			name := "assets"
 			r := rule.NewRule(getKind(args.Config, "web_assets"), name)
@@ -675,12 +740,12 @@ func (lang *JS) genWebAssets(args language.GenerateArgs, webAssetsSet map[string
 
 			// record all webAssets rules for all_assets rule later
 			fqName := fmt.Sprintf("//%s:%s", path.Join(args.Rel), name)
-			jsConfig.AggregatedAssets[fqName] = true
+			jsConfig.CollectedAssets[fqName] = true
 
 		} else {
 			// add as singletons
 			rules := lang.makeRules(ruleArgs{
-				ruleType: getKind(args.Config, "web_asset"),
+				ruleType: getKind(args.Config, "web_assets"),
 				srcs:     webAssets,
 				trimExt:  false, //shadow the original file name
 			}, jsConfig)
@@ -691,7 +756,7 @@ func (lang *JS) genWebAssets(args language.GenerateArgs, webAssetsSet map[string
 
 				// record all webAssets rules for all_assets rule later
 				fqName := fmt.Sprintf("//%s:%s", path.Join(args.Rel), r.Name())
-				jsConfig.AggregatedAssets[fqName] = true
+				jsConfig.CollectedAssets[fqName] = true
 			}
 		}
 	}
@@ -703,10 +768,10 @@ func (lang *JS) genAllAssets(args language.GenerateArgs, isJSRoot bool, jsConfig
 	generatedRules := make([]*rule.Rule, 0)
 	generatedImports := make([]interface{}, 0)
 
-	if isJSRoot && jsConfig.AggregateAllAssets {
+	if isJSRoot && jsConfig.CollectAllAssets && len(jsConfig.CollectedAssets) > 0 {
 		// Generate all_assets rule
 		JSRootDeps := []string{}
-		for fqName := range jsConfig.AggregatedAssets {
+		for fqName := range jsConfig.CollectedAssets {
 			JSRootDeps = append(JSRootDeps, fqName)
 		}
 		name := "all_assets"
@@ -720,16 +785,18 @@ func (lang *JS) genAllAssets(args language.GenerateArgs, isJSRoot bool, jsConfig
 	return generatedRules, generatedImports
 }
 
-func (lang *JS) readExistingRules(args language.GenerateArgs) map[string]*rule.Rule {
+func (lang *JS) readExistingRules(args language.GenerateArgs, managedOnly bool) map[string]*rule.Rule {
 	existingRules := make(map[string]*rule.Rule)
 
 	// BUILD file exists?
 	if BUILD := args.File; BUILD != nil {
 		// For each existing rule
 		for _, r := range BUILD.Rules {
-			if _, ok := managedRulesSet[r.Kind()]; !ok {
-				// not a managed rule
-				continue
+			if managedOnly {
+				if _, ok := managedRulesSet[r.Kind()]; !ok {
+					// skip unmanaged rules
+					continue
+				}
 			}
 			existingRules[r.Name()] = r
 		}
@@ -783,6 +850,10 @@ func (*JS) Fix(c *config.Config, f *rule.File) {
 			if r.Kind() == "ts_library" {
 				r.Delete()
 			}
+			// delete deprecated ts_definition rule
+			if r.Kind() == "ts_definition" {
+				r.Delete()
+			}
 		}
 		for _, l := range f.Loads {
 
@@ -791,6 +862,9 @@ func (*JS) Fix(c *config.Config, f *rule.File) {
 			}
 			if l.Has("ts_library") {
 				l.Remove("ts_library")
+			}
+			if l.Has("ts_definition") {
+				l.Remove("ts_definition")
 			}
 		}
 	}

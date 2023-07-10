@@ -1,4 +1,0 @@
-# gazelle:js_root
-# gazelle:js_web_asset json
-# gazelle:js_package_file package.json
-# gazelle:npm_label //:node_modules/

@@ -1,0 +1,6 @@
+load("@com_github_benchsci_rules_nodejs_gazelle//:defs.bzl", "web_assets")
+
+web_assets(
+    name = "data_json",
+    srcs = ["data.json"],
+)
