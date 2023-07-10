@@ -1,0 +1,19 @@
+load("@com_github_benchsci_rules_nodejs_gazelle//:defs.bzl", "web_assets")
+
+# gazelle:js_root
+# gazelle:js_web_asset json,css,scss
+# gazelle:js_collect_all_assets
+
+web_assets(
+    name = "data_json",
+    srcs = ["data.json"],
+)
+
+web_assets(
+    name = "all_assets",
+    srcs = [
+        "//:data_json",
+        "//a:data_json",
+        "//b:style_css",
+    ],
+)

@@ -1,0 +1,91 @@
+load("//bazel:web_assets.bzl", "web_assets")
+load("@aspect_rules_js//js:defs.bzl", "js_library", "js_test")
+load("@bazel_skylib//rules:build_test.bzl", "build_test")
+load("@npm//:defs.bzl", "npm_link_all_packages")
+load("//bazel:next.bzl", "next")
+
+# gazelle:exclude next-env.d.ts
+# gazelle:exclude next.config.js
+
+# gazelle:js_collect_web_assets
+# gazelle:js_collect_all_assets
+
+# gazelle:js_package_file package.json :node_modules
+# gazelle:js_jest_config :jest.config
+# gazelle:js_root
+
+# gazelle:js_visibility //apps/alpha:__subpackages__
+
+npm_link_all_packages(name = "node_modules")
+
+# Run `bazel build //apps/alpha:next` to build (equivalent to running `next build`).
+#
+# It is recommended that you use [ibazel](https://github.com/bazelbuild/bazel-watcher)
+# to run the devserver targets.
+#
+# Run `ibazel run //apps/alpha:next_dev` to run the development server in watch mode
+# (equivalent to running `next dev`).
+#
+# Run `ibazel run //apps/alpha:next_start` to run the production server in watch mode
+# (equivalent to running `next start`).
+next(
+    name = "next",
+    srcs = [
+        ":all_assets",
+        "//apps/alpha/pages",
+    ],
+    data = [
+        "next.config.js",
+        "package.json",
+        ":node_modules/is-even",
+        "//:node_modules/@nextjs-example/one",
+        "//:node_modules/next",
+        "//:node_modules/react",
+        "//:node_modules/react-dom",
+        "//:node_modules/typescript",
+    ],
+    next_bin = "../../node_modules/.bin/next",
+    next_js_binary = "//:next_js_binary",
+)
+
+# A smoke test on the artifact produced by the :next target
+js_test(
+    name = "build_smoke_test",
+    size = "small",
+    chdir = package_name(),
+    data = [":next"],
+    entry_point = "build_smoke_test.js",
+)
+
+build_test(
+    name = "build_test",
+    targets = [
+        ":next",
+        # Not build testing the `:next_export` target since this `next export` writes back to the `.next` directory which
+        # causes issues with trying to write to an input. See https://github.com/vercel/next.js/issues/43344.
+        # TODO: fix in Next.js (https://github.com/vercel/next.js/issues/43344) or find work-around.
+        # ":next_export",
+    ],
+)
+
+web_assets(
+    name = "all_assets",
+    srcs = [
+        "//apps/alpha/public:assets",
+        "//apps/alpha/styles:assets",
+    ],
+)
+
+js_library(
+    name = "jest.config",
+    srcs = ["jest.config.js"],
+    data = ["//:node_modules/next"],
+    visibility = ["//apps/alpha:__subpackages__"],
+    deps = ["//:node_modules/next"],
+)
+
+js_library(
+    name = "package_json",
+    srcs = ["package.json"],
+    visibility = ["//apps/alpha:__subpackages__"],
+)

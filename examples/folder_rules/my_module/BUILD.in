@@ -1,3 +1,0 @@
-# gazelle:js_folder_as_rule
-# gazelle:js_test_shard_count 2
-# gazelle:js_test_size large

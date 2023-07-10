@@ -103,17 +103,17 @@ func (lang *JS) Imports(c *config.Config, r *rule.Rule, f *rule.File) []resolve.
 		})
 	}
 
-	isModule := false
+	isBarrel := false
 	// look for index.js and mark this rule as a module rule
 	for _, src := range srcs {
-		if isModuleFile(src) {
-			isModule = true
+		if isBarrelFile(src) {
+			isBarrel = true
 			break
 		}
 	}
 
 	// modules can be resolved via the directory containing them
-	if isModule {
+	if isBarrel {
 		importSpecs = append(importSpecs, resolve.ImportSpec{
 			Lang: lang.Name(),
 			Imp:  f.Pkg,
@@ -121,7 +121,7 @@ func (lang *JS) Imports(c *config.Config, r *rule.Rule, f *rule.File) []resolve.
 	}
 
 	// Any subfolders could be used to depend on this rule
-	folderImports := jsConfig.FolderAsRule && (r.Kind() == getKind(c, "ts_project") || r.Kind() == getKind(c, "js_library"))
+	folderImports := jsConfig.CollectAll && (r.Kind() == getKind(c, "ts_project") || r.Kind() == getKind(c, "js_library"))
 	if folderImports {
 		base := filepath.Dir(f.Path)
 		filepath.Walk(base, func(path string, info fs.FileInfo, err error) error {
@@ -188,18 +188,25 @@ func (lang *JS) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Remote
 		}
 
 		// is it an npm dependency?
-		if lang.isNpmDependency(name, jsConfig) {
+		isNpm, npmLabel, devDep := lang.isNpmDependency(name, jsConfig)
+		if isNpm {
+
 			s := strings.Split(name, "/")
 			name = s[0]
 			if strings.HasPrefix(name, "@") {
 				name += "/" + s[1]
 			}
-			depSet[jsConfig.NpmLabel+name] = true
+			depSet[fmt.Sprintf("%s%s", npmLabel, name)] = true
+			if !devDep {
+				// Runtime dependency
+				dataSet[fmt.Sprintf("%s%s", npmLabel, name)] = true
+			}
 
 			if jsConfig.LookupTypes && r.Kind() == "ts_project" {
 				// does it have a corresponding @types/[...] declaration?
-				if lang.isNpmDependency("@types/"+name, jsConfig) {
-					depSet[jsConfig.NpmLabel+"@types/"+name] = true
+				typesFound, npmLabel, _ := lang.isNpmDependency("@types/"+name, jsConfig)
+				if typesFound {
+					depSet[fmt.Sprintf("%s@types/%s", npmLabel, name)] = true
 				}
 			}
 
@@ -210,8 +217,10 @@ func (lang *JS) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Remote
 		if _, ok := BUILTINS[name]; ok {
 			// add @types/node when using node.js builtin and have @types/nodes installed
 			if jsConfig.LookupTypes && r.Kind() == "ts_project" {
-				if lang.isNpmDependency("@types/node", jsConfig) {
-					depSet[jsConfig.NpmLabel+"@types/node"] = true
+				// does it have a corresponding @types/[...] declaration?
+				typesFound, npmLabel, _ := lang.isNpmDependency("@types/"+name, jsConfig)
+				if typesFound {
+					depSet[fmt.Sprintf("%s@types/%s", npmLabel, name)] = true
 				}
 			}
 			continue
@@ -238,6 +247,28 @@ func (lang *JS) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Remote
 
 	}
 
+	// Add in additional jest dependencies
+	if r.Kind() == getKind(c, "jest_test") {
+		for name, npmLabel := range jsConfig.NpmDependencies.DevDependencies {
+			if name == "jest-cli" || name == "jest-junit" {
+				continue
+			}
+			if strings.HasPrefix(name, "@types/jest") {
+				depSet[fmt.Sprintf("%s%s", npmLabel, name)] = true
+			}
+			if strings.HasPrefix(name, "jest") {
+				depSet[fmt.Sprintf("%s%s", npmLabel, name)] = true
+				dataSet[fmt.Sprintf("%s%s", npmLabel, name)] = true
+			}
+		}
+
+		packageLocation := jsConfig.JSRoot
+		if packageLocation == "." {
+			packageLocation = ""
+		}
+		dataSet[fmt.Sprintf("//%s:package_json", packageLocation)] = true
+	}
+
 	deps := []string{}
 	for dep := range depSet {
 		deps = append(deps, dep)
@@ -246,7 +277,6 @@ func (lang *JS) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Remote
 		r.SetAttr("deps", deps)
 	} else {
 		r.DelAttr("deps")
-
 	}
 
 	data := []string{}
@@ -255,6 +285,8 @@ func (lang *JS) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Remote
 	}
 	if len(data) > 0 {
 		r.SetAttr("data", data)
+	} else {
+		r.DelAttr("data")
 	}
 }
 
@@ -279,7 +311,12 @@ func (lang *JS) resolveWalkParents(name string, depSet map[string]bool, dataSet 
 		target := path.Join(localDir, name)
 
 		// add supported extensions to target name to get a filePath
-		for _, ext := range append(append([]string{""}, tsExtensions...), jsExtensions...) {
+		extraExtensionsToTry := []string{""}
+		if !lang.isWebAsset(jsConfig, target) {
+			extraExtensionsToTry = append(append(extraExtensionsToTry, tsExtensions...), jsExtensions...)
+		}
+
+		for _, ext := range extraExtensionsToTry {
 
 			filePath := target + ext
 			tries = append(tries, filePath)
@@ -298,7 +335,11 @@ func (lang *JS) resolveWalkParents(name string, depSet map[string]bool, dataSet 
 				// add discovered label
 				lbl := resolveResult.label
 				dep := lbl.Rel(from.Repo, from.Pkg).String()
-				depSet[dep] = true
+				if !lang.isWebAsset(jsConfig, filePath) {
+					depSet[dep] = true
+				} else {
+					dataSet[dep] = true
+				}
 				return
 			}
 			if resolveResult.fileName != "" {
@@ -317,7 +358,7 @@ func (lang *JS) resolveWalkParents(name string, depSet map[string]bool, dataSet 
 				log.Print(Err("[%s] import %v not found", from.Abs(from.Repo, from.Pkg).String(), name))
 			}
 			if jsConfig.Verbose {
-				log.Print(Warn("tried @npm//%s", name))
+				log.Print(Warn("tried node_modules/%s", name))
 				for _, try := range tries {
 					log.Print(Warn("tried %s", try))
 				}
@@ -332,38 +373,47 @@ func (lang *JS) resolveWalkParents(name string, depSet map[string]bool, dataSet 
 }
 
 // https://nodejs.org/api/modules.html#modules_all_together
-func (lang *JS) isNpmDependency(imp string, jsConfig *JsConfig) bool {
+func (lang *JS) isNpmDependency(imp string, jsConfig *JsConfig) (bool, string, bool) {
 
 	// These prefixes cannot be NPM dependencies
 	var prefixes = []string{".", "/", "../", "~/", "@/", "~~/"}
 	if hasPrefix(prefixes, imp) {
-		return false
-	}
-
-	// Assume all @ imports are npm dependencies
-	if strings.HasPrefix(imp, "@") {
-		return true
+		return false, "", false
 	}
 
 	// Grab the first part of the import (ie "foo/bar" -> "foo")
 	packageRoot := imp
 	for i := range imp {
 		if imp[i] == '/' {
-			packageRoot = imp[:i]
-			break
+			prefix := imp[:i]
+			if prefix == "@types" {
+				continue
+			} else {
+				packageRoot = prefix
+				break
+			}
 		}
 	}
 
 	// Is the package root found in package.json ?
-	if _, ok := jsConfig.NpmDependencies.Dependencies[packageRoot]; ok {
-		return true
+	if npmLabel, ok := jsConfig.NpmDependencies.Dependencies[packageRoot]; ok {
+		return true, npmLabel, false
 	}
 
-	if _, ok := jsConfig.NpmDependencies.DevDependencies[packageRoot]; ok {
-		return true
+	if npmLabel, ok := jsConfig.NpmDependencies.DevDependencies[packageRoot]; ok {
+		return true, npmLabel, true
 	}
 
-	return false
+	// Assume all @ imports are npm dependencies
+	if strings.HasPrefix(imp, "@types") {
+		// Need to ignore @types, since these are checked greedily
+		return false, "", false
+	}
+	if strings.HasPrefix(imp, "@") {
+		return true, jsConfig.DefaultNpmLabel, false
+	}
+
+	return false, "", false
 }
 
 func hasPrefix(suffixes []string, x string) bool {

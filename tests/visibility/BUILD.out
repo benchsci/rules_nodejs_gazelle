@@ -1,0 +1,10 @@
+load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
+
+# gazelle:js_root
+# gazelle:js_visibility //visibility:public
+
+ts_project(
+    name = "a",
+    srcs = ["a.ts"],
+    visibility = ["//visibility:public"],
+)

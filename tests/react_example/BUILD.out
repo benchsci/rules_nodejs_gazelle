@@ -1,0 +1,45 @@
+load("@aspect_rules_js//js:defs.bzl", "js_library")
+load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
+
+# gazelle:js_root
+# gazelle:js_lookup_types
+# gazelle:js_package_file package.json :node_modules
+
+js_library(
+    name = "package_json",
+    srcs = ["package.json"],
+)
+
+ts_project(
+    name = "with_import",
+    srcs = ["with_import.tsx"],
+    data = ["//:node_modules/react"],
+    deps = [
+        "//:node_modules/@types/react",
+        "//:node_modules/react",
+    ],
+)
+
+ts_project(
+    name = "without_import",
+    srcs = ["without_import.tsx"],
+    data = ["//:node_modules/react"],
+    deps = [
+        "//:node_modules/@types/react",
+        "//:node_modules/react",
+    ],
+)
+
+js_library(
+    name = "js_with_import",
+    srcs = ["js_with_import.jsx"],
+    data = ["//:node_modules/react"],
+    deps = ["//:node_modules/react"],
+)
+
+js_library(
+    name = "js_without_import",
+    srcs = ["js_without_import.jsx"],
+    data = ["//:node_modules/react"],
+    deps = ["//:node_modules/react"],
+)

@@ -1,0 +1,21 @@
+load("@aspect_rules_js//js:defs.bzl", "web_assets", "js_library")
+
+# gazelle:js_root
+# gazelle:js_web_asset json
+# gazelle:js_package_file package.json :node_modules
+
+js_library(
+    name = "a",
+    srcs = ["a.js"],
+    deps = [],
+)
+
+js_library(
+    name = "b",
+    srcs = ["b.js"],
+)
+
+web_assets(
+    name = "package_json",
+    srcs = ["package.json"],
+)

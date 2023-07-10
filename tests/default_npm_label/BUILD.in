@@ -1,0 +1,5 @@
+# gazelle:js_root
+# gazelle:js_web_asset json
+# gazelle:js_package_file package.json @npm//:
+# gazelle:js_default_npm_label @npm//:
+# gazelle:js_lookup_types false

@@ -5,6 +5,10 @@ that generates BUILD file content for javascript/typescript code.
 
 ## Setup
 
+### Example setup
+
+[examples/nextjs](examples/nextjs) contains an end-to-end working example of BUILD file generation for an example next.js project. It may be helpful to reference when configuring your project
+
 ### Gazelle
 
 To use this extension in a project, you'll need to add Gazelle and its dependencies to your `WORKSPACE` file.
@@ -53,11 +57,16 @@ gazelle_binary(
 
 ### NPM setup
 
-If you are using NPM for your project, you will probably want to add at least these directives to your root `BUILD` file as well:
+If you are using NPM for your project, you will probably want to add at least these directives (more on directives below) to your root `BUILD` file as well:
 
 ```starlark
-# gazelle:exclude node_modules
-# gazelle:js_package_file package.json
+# gazelle:exclude **/node_modules
+# gazelle:exclude tsconfig.json
+
+# gazelle:js_package_file package.json :node_modules
+# gazelle:js_web_asset .json,.css,.scss
+# gazelle:js_collect_all_assets
+# gazelle:js_root
 ```
 
 ### Custom rule or macro implementations
@@ -82,7 +91,7 @@ This means, for example, if you set `# gazelle:prefix` in the build file
 in your project's root directory, it affects your whole project. If you
 set it in a subdirectory, it only affects rules in that subtree.
 
-Example of most of these directives can be found in [examples](examples)
+Example of most of these directives can be found in [tests](tests)
 
 The following directives are recognized by this plugin:
 
@@ -104,24 +113,24 @@ The following directives are recognized by this plugin:
   </tr>
 
   <tr>
-    <td><code># gazelle:npm_label</code></td>
-    <td><code>@npm//</code></td>
+    <td><code># gazelle:js_default_npm_label</code></td>
+    <td><code>//:node_modules</code></td>
   </tr>
   <tr>
-    <td colspan="2"><p dir="auto">Defines the label prefix for third npm dependencies e.g @npm// OR //:node_modules/ </p></td>
+    <td colspan="2"><p dir="auto">Defines the label prefix for third npm dependencies. <code>//:node_modules/</code> is default for Aspect's rules_js, <code>@npm//</code> is default for rules_nodejs</p></td>
   </tr>
 
   <tr>
     <td><code># gazelle:js_lookup_types true|false</code></td>
-    <td><code>false</code></td>
+    <td><code>true</code></td>
   </tr>
   <tr>
-    <td colspan="2"><p dir="auto">Causes Gazelle to try and find a matching @npm//types dependency for each @npm dependency, including @types/node for Node.js builtins</p></td>
+    <td colspan="2"><p dir="auto">Causes Gazelle to try and find a matching "@types/pkg" dependency for each "pkg" dependency, including @types/node for Node.js builtins</p></td>
   </tr>
 
   <tr>
-    <td><code># gazelle:js_package_file package.json</code></td>
-    <td><code>none</code></td>
+    <td><code># gazelle:js_package_file package.json :node_modules</code></td>
+    <td><code>//:node_modules</code></td>
   </tr>
   <tr>
     <td colspan="2"><p dir="auto">Instructs Gazelle to use a package.json file to lookup imports from dependencies and devDependencies</p></td>
@@ -152,15 +161,15 @@ The following directives are recognized by this plugin:
   </tr>
 
   <tr>
-    <td><code># gazelle:js_folder_as_rule</code></td>
+    <td><code># gazelle:js_collect_all</code></td>
     <td><code>none</code></td>
   </tr>
   <tr>
-    <td colspan="2"><p dir="auto">Stops recursion into subdirectories of the folder containing the directive, and collects all sources and tests into a single rule. Use this to reduce rule count for large repositories. See <code>examples/folder_rules</code> for usage.</p></td>
+    <td colspan="2"><p dir="auto">Stops recursion into subdirectories of the folder containing the directive, and collects all sources and tests into a single rule. Use this to reduce rule count for large repositories. See <code>tests/folder_rules</code> for usage.</p></td>
   </tr>
 
   <tr>
-    <td><code># gazelle:js_aggregate_modules true|false</code></td>
+    <td><code># gazelle:js_collect_barrels true|false</code></td>
     <td><code>false</code></td>
   </tr>
   <tr>
@@ -168,7 +177,7 @@ The following directives are recognized by this plugin:
   </tr>
 
   <tr>
-    <td><code># gazelle:js_aggregate_web_assets true|false</code></td>
+    <td><code># gazelle:js_collect_web_assets true|false</code></td>
     <td><code>false</code></td>
   </tr>
   <tr>
@@ -176,11 +185,11 @@ The following directives are recognized by this plugin:
   </tr>
 
   <tr>
-    <td><code># gazelle:js_aggregate_all_assets true|false</code></td>
+    <td><code># gazelle:js_collect_all_assets true|false</code></td>
     <td><code>false</code></td>
   </tr>
   <tr>
-    <td colspan="2"><p dir="auto">Generates a <code>web_assets</code> rule in the configured <code>web_root</code> that refers to all of the <code>web_assets</code> rules in child packages using</p></td>
+    <td colspan="2"><p dir="auto">Generates a <code>web_assets</code> rule in the configured <code>js_root</code> that refers to all of the <code>web_assets</code> rules in child packages</p></td>
   </tr>
 
   <tr>
@@ -205,6 +214,22 @@ The following directives are recognized by this plugin:
   </tr>
   <tr>
     <td colspan="2"><p dir="auto">Print more information about missing imports (overrides gazelle:js_quiet)</p></td>
+  </tr>
+
+  <tr>
+    <td><code># gazelle:js_jest_config :my_config</code></td>
+    <td><code>none</code></td>
+  </tr>
+  <tr>
+    <td colspan="2"><p dir="auto">Provide a default label for the <code>config</code> attribute of generated <code>jest_test</code> rules. This is required when using <code>jest_test</code></p></td>
+  </tr>
+
+  <tr>
+    <td><code># gazelle:js_jest_size</code></td>
+    <td><code>none</code></td>
+  </tr>
+  <tr>
+    <td colspan="2"><p dir="auto">Provide a default value for the <code>size</code> attribute of generated <code>jest_test</code> rules</p></td>
   </tr>
 
 </tbody>

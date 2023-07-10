@@ -1,0 +1,10 @@
+load("//bazel:web_assets.bzl", "web_assets")
+
+web_assets(
+    name = "assets",
+    srcs = [
+        "Home.module.css",
+        "globals.css",
+    ],
+    visibility = ["//apps/alpha:__subpackages__"],
+)

@@ -1,0 +1,9 @@
+load("@aspect_rules_js//js:defs.bzl", "web_assets", "js_library")
+load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
+
+# gazelle:js_root
+
+js_library(
+    name = "a",
+    srcs = ["a.js"],
+)

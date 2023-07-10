@@ -1,8 +1,0 @@
-load("@npm//@bazel/typescript:index.bzl", "ts_project")
-
-# gazelle:js_root
-
-ts_project(
-    name = "a",
-    srcs = ["a.ts"],
-)
