@@ -1,4 +1,8 @@
-# Next.js Bazel example
+# Next.js Bazel // Gazelle example
+
+This is an example adapted from [aspect-build/bazel-examples](https://github.com/aspect-build/bazel-examples) with rules generation using the Gazelle plugin. A few things are still missing, notably linting using eslint.
+
+# Original Readme.MD:
 
 This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app) and then Bazelified.
 
