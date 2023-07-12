@@ -412,11 +412,6 @@ func (*JS) Configure(c *config.Config, rel string, f *rule.File) {
 	}
 }
 
-var tsDefsExtensions = []string{
-	".d.ts",
-	".d.tsx",
-}
-
 var jsTestExtensions = []string{
 	".test.js",
 	".test.jsx",
@@ -437,13 +432,11 @@ var jsExtensions = []string{
 	".jsx",
 }
 
-var tsDefsExtensionsPattern *regexp.Regexp
 var jsTestExtensionsPattern *regexp.Regexp
 var tsTestExtensionsPattern *regexp.Regexp
 var tsExtensionsPattern *regexp.Regexp
 var jsExtensionsPattern *regexp.Regexp
 
-func init() { tsDefsExtensionsPattern = extensionPattern(tsDefsExtensions) }
 func init() { tsTestExtensionsPattern = extensionPattern(tsTestExtensions) }
 func init() { jsTestExtensionsPattern = extensionPattern(jsTestExtensions) }
 func init() { tsExtensionsPattern = extensionPattern(tsExtensions) }

@@ -119,8 +119,7 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 	generatedRules := make([]*rule.Rule, 0)
 	generatedImports := make([]interface{}, 0)
 
-	var tsdSources,
-		jestSources,
+	var jestSources,
 		tsSources,
 		jsSources,
 		webAssetsSet,
@@ -137,11 +136,6 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		generatedRules = append(generatedRules, generatedPkgRule)
 		generatedImports = append(generatedImports, &noImports)
 	}
-
-	// add "ts_definition" rule(s)
-	generatedTSDRules, generatedTSDImports := lang.genTSDefinition(args, jsConfig, tsdSources)
-	generatedRules = append(generatedRules, generatedTSDRules...)
-	generatedImports = append(generatedImports, generatedTSDImports...)
 
 	// add "jest_test" rule(s)
 	generatedTestRules, generatedTestImports := lang.genJestTest(args, jsConfig, jestSources)
@@ -189,10 +183,9 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 	}
 }
 
-func (lang *JS) collectSources(args language.GenerateArgs, jsConfig *JsConfig) ([]string, []string, []string, []string, map[string]bool, bool, bool) {
+func (lang *JS) collectSources(args language.GenerateArgs, jsConfig *JsConfig) ([]string, []string, []string, map[string]bool, bool, bool) {
 
 	managedFiles := make(map[string]bool)
-	tsdSources := []string{}
 	jestSources := []string{}
 	tsSources := []string{}
 	jsSources := []string{}
@@ -217,15 +210,8 @@ func (lang *JS) collectSources(args language.GenerateArgs, jsConfig *JsConfig) (
 
 		managedFiles[baseName] = true
 
-		// TS DEFINITIONS ".d.ts"
-		match := tsDefsExtensionsPattern.FindStringSubmatch(baseName)
-		if len(match) > 0 {
-			tsdSources = append(tsdSources, baseName)
-			continue
-		}
-
 		// TS & JS TEST
-		match = append(jsTestExtensionsPattern.FindStringSubmatch(baseName), tsTestExtensionsPattern.FindStringSubmatch(baseName)...)
+		match := append(jsTestExtensionsPattern.FindStringSubmatch(baseName), tsTestExtensionsPattern.FindStringSubmatch(baseName)...)
 		if len(match) > 0 {
 			jestSources = append(jestSources, baseName)
 			continue
@@ -256,8 +242,7 @@ func (lang *JS) collectSources(args language.GenerateArgs, jsConfig *JsConfig) (
 
 	}
 
-	return tsdSources,
-		jestSources,
+	return jestSources,
 		tsSources,
 		jsSources,
 		webAssetsSet,
@@ -334,24 +319,6 @@ func (lang *JS) genPkgRule(args language.GenerateArgs, jsConfig *JsConfig) *rule
 		}
 	}
 	return nil
-}
-
-func (lang *JS) genTSDefinition(args language.GenerateArgs, jsConfig *JsConfig, tsdSources []string) ([]*rule.Rule, []interface{}) {
-	generatedRules := make([]*rule.Rule, 0)
-	generatedImports := make([]interface{}, 0)
-
-	for _, baseName := range tsdSources {
-		match := tsDefsExtensionsPattern.FindStringSubmatch(baseName)
-		r := rule.NewRule(getKind(args.Config, "ts_project"), strings.TrimSuffix(baseName, match[0])+".d")
-		r.SetAttr("srcs", []string{baseName})
-		if len(jsConfig.Visibility.Labels) > 0 {
-			r.SetAttr("visibility", jsConfig.Visibility.Labels)
-		}
-		generatedRules = append(generatedRules, r)
-		generatedImports = append(generatedImports, &noImports)
-	}
-
-	return generatedRules, generatedImports
 }
 
 func (lang *JS) genJestTest(args language.GenerateArgs, jsConfig *JsConfig, jestSources []string) ([]*rule.Rule, []interface{}) {
