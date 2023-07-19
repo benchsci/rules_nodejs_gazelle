@@ -18,11 +18,9 @@ package js
 
 import (
 	"fmt"
-	"io/fs"
 	"log"
 	"os"
 	"path"
-	"path/filepath"
 	"sort"
 	"strings"
 
@@ -111,6 +109,21 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 
 	if !jsConfig.Enabled {
 		// ignore this directory
+		return language.GenerateResult{}
+	}
+
+	if jsConfig.CollectAll && jsConfig.CollectAllRoot != args.Rel {
+		// collect all files in this directory for use in parent rules
+		for _, fileName := range args.RegularFiles {
+			path := strings.TrimPrefix(
+				strings.TrimPrefix(
+					path.Join(args.Rel, fileName),
+					jsConfig.CollectAllRoot,
+				),
+				"/",
+			)
+			jsConfig.CollectAllSources[path] = true
+		}
 		return language.GenerateResult{}
 	}
 
@@ -262,16 +275,8 @@ func (lang *JS) isWebAsset(jsConfig *JsConfig, baseName string) bool {
 func (lang *JS) gatherFiles(args language.GenerateArgs, jsConfig *JsConfig) []string {
 	allFiles := args.RegularFiles
 	if jsConfig.CollectAll {
-		for _, subDir := range args.Subdirs {
-			relDir := path.Join(args.Dir, subDir)
-			filepath.Walk(relDir, func(path string, info fs.FileInfo, err error) error {
-				if info != nil && !info.IsDir() {
-					allFiles = append(allFiles,
-						strings.TrimPrefix(strings.TrimPrefix(path, args.Dir), "/"),
-					)
-				}
-				return nil
-			})
+		for file, _ := range jsConfig.CollectAllSources {
+			allFiles = append(allFiles, file)
 		}
 	}
 	return allFiles
@@ -338,8 +343,8 @@ func (lang *JS) genJestTest(args language.GenerateArgs, jsConfig *JsConfig, jest
 			)
 			r.SetAttr("srcs", []string{baseName})
 
-			if jsConfig.JestConfig == "" {
-				log.Print(Err("[%s/%s] jest_test missing config, use gazelle:js_jest_config directive", args.Rel, baseName))
+			if jsConfig.JestConfig == "" && !jsConfig.Quiet {
+				log.Print(Warn("[%s/%s] no config for jest_test, use gazelle:js_jest_config directive", args.Rel, baseName))
 			}
 			r.SetAttr("config", jsConfig.JestConfig)
 			if jsConfig.JestSize != "" {

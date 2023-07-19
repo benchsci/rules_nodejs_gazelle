@@ -1,0 +1,26 @@
+load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
+load("@rules_jest//jest:defs.bzl", "jest_test")
+
+# gazelle:js_collect_all
+# gazelle:js_jest_shard_count 2
+# gazelle:js_jest_size large
+
+jest_test(
+    name = "double_nested_module_test",
+    size = "large",
+    srcs = [
+        "a.test.ts",
+        "b.test.ts",
+    ],
+    config = "//:jest.config",
+    data = ["//:package_json"],
+    shard_count = 2,
+)
+
+ts_project(
+    name = "double_nested_module",
+    srcs = [
+        "index.ts",
+        "module_file.ts",
+    ],
+)

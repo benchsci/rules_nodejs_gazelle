@@ -59,20 +59,22 @@ type JsConfig struct {
 		DevDependencies map[string]string `json:"devDependencies"`
 	}
 	LookupTypes        bool
-	ImportAliases      map[string]string
+	ImportAliases      []struct{ From, To string }
 	ImportAliasPattern *regexp.Regexp
 	Visibility         Visibility
 	CollectBarrels     bool
 	CollectWebAssets   bool
 	CollectAllAssets   bool
 	CollectedAssets    map[string]bool
+	CollectAll         bool
+	CollectAllRoot     string
+	CollectAllSources  map[string]bool
 	Fix                bool
 	JSRoot             string
 	WebAssetSuffixes   map[string]bool
 	Quiet              bool
 	Verbose            bool
 	DefaultNpmLabel    string
-	CollectAll         bool
 	JestConfig         string
 	JestShards         int
 	JestSize           string
@@ -90,24 +92,26 @@ func NewJsConfig() *JsConfig {
 			DevDependencies: make(map[string]string),
 		},
 		LookupTypes:        true,
-		ImportAliases:      make(map[string]string),
+		ImportAliases:      []struct{ From, To string }{},
 		ImportAliasPattern: regexp.MustCompile("$^"),
 		Visibility: Visibility{
 			Labels: []string{},
 		},
-		CollectBarrels:   false,
-		CollectWebAssets: false,
-		CollectAllAssets: false,
-		CollectedAssets:  make(map[string]bool),
-		CollectAll:       false,
-		Fix:              false,
-		JSRoot:           "/",
-		WebAssetSuffixes: make(map[string]bool),
-		Quiet:            false,
-		Verbose:          false,
-		DefaultNpmLabel:  "//:node_modules/",
-		JestShards:       -1,
-		JestConfig:       "",
+		CollectBarrels:    false,
+		CollectWebAssets:  false,
+		CollectAllAssets:  false,
+		CollectedAssets:   make(map[string]bool),
+		CollectAll:        false,
+		CollectAllRoot:    "",
+		CollectAllSources: make(map[string]bool),
+		Fix:               false,
+		JSRoot:            "/",
+		WebAssetSuffixes:  make(map[string]bool),
+		Quiet:             false,
+		Verbose:           false,
+		DefaultNpmLabel:   "//:node_modules/",
+		JestShards:        -1,
+		JestConfig:        "",
 	}
 }
 
@@ -117,8 +121,7 @@ func (parent *JsConfig) NewChild() *JsConfig {
 
 	child := NewJsConfig()
 
-	child.CollectAll = false
-	child.Enabled = parent.Enabled && !parent.CollectAll
+	child.Enabled = parent.Enabled
 
 	child.PackageFile = parent.PackageFile
 
@@ -138,11 +141,13 @@ func (parent *JsConfig) NewChild() *JsConfig {
 	}
 
 	child.LookupTypes = parent.LookupTypes
-	child.ImportAliases = make(map[string]string) // copy map
-	for k, v := range parent.ImportAliases {
-		child.ImportAliases[k] = v
+	child.ImportAliases = parent.ImportAliases
+	child.ImportAliases = make([]struct{ From, To string }, len(parent.ImportAliases)) // copy slice
+	for i := range parent.ImportAliases {
+		child.ImportAliases[i] = parent.ImportAliases[i]
 	}
 	child.ImportAliasPattern = parent.ImportAliasPattern // Regenerated on change to ImportAliases
+
 	child.Visibility = Visibility{
 		Labels: make([]string, len(parent.Visibility.Labels)), // copy slice
 	}
@@ -153,6 +158,10 @@ func (parent *JsConfig) NewChild() *JsConfig {
 	child.CollectWebAssets = parent.CollectWebAssets
 	child.CollectAllAssets = parent.CollectAllAssets
 	child.CollectedAssets = parent.CollectedAssets // Reinitialized on change to JSRoot
+
+	child.CollectAll = parent.CollectAll
+	child.CollectAllRoot = parent.CollectAllRoot
+	child.CollectAllSources = parent.CollectAllSources // Copy reference, reinitialized on change to CollectAll
 
 	child.JestShards = parent.JestShards
 	child.JestSize = parent.JestSize
@@ -321,12 +330,12 @@ func (*JS) Configure(c *config.Config, rel string, f *rule.File) {
 
 			case "js_import_alias":
 				vals := strings.SplitN(directive.Value, " ", 2)
-				jsConfig.ImportAliases[vals[0]] = vals[1]
+				jsConfig.ImportAliases = append(jsConfig.ImportAliases, struct{ From, To string }{From: vals[0], To: strings.TrimSpace(vals[1])})
 
 				// Regenerate ImportAliasPattern
 				keyPatterns := make([]string, 0, len(jsConfig.ImportAliases))
-				for k := range jsConfig.ImportAliases {
-					keyPatterns = append(keyPatterns, fmt.Sprintf("(^%s)", regexp.QuoteMeta(k)))
+				for _, alias := range jsConfig.ImportAliases {
+					keyPatterns = append(keyPatterns, fmt.Sprintf("(^%s)", regexp.QuoteMeta(alias.From)))
 				}
 
 				var err error
@@ -370,7 +379,14 @@ func (*JS) Configure(c *config.Config, rel string, f *rule.File) {
 				jsConfig.CollectAllAssets = readBoolDirective(directive)
 
 			case "js_collect_all":
-				jsConfig.CollectAll = readBoolDirective(directive)
+				collectRoot, err := filepath.Rel(".", f.Pkg)
+				if err != nil {
+					log.Fatalf(Err("failed to read directive %s: %v", directive.Key, err))
+				} else {
+					jsConfig.CollectAllRoot = collectRoot
+					jsConfig.CollectAll = true
+					jsConfig.CollectAllSources = make(map[string]bool)
+				}
 
 			case "js_jest_config":
 				jsConfig.JestConfig = labels.ParseRelative(directive.Value, f.Pkg).Format()

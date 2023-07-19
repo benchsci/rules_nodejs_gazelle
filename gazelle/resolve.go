@@ -18,7 +18,6 @@ package js
 
 import (
 	"fmt"
-	"io/fs"
 	"log"
 	"os"
 	"path"
@@ -124,17 +123,20 @@ func (lang *JS) Imports(c *config.Config, r *rule.Rule, f *rule.File) []resolve.
 	folderImports := jsConfig.CollectAll && (r.Kind() == getKind(c, "ts_project") || r.Kind() == getKind(c, "js_library"))
 	if folderImports {
 		base := filepath.Dir(f.Path)
-		filepath.Walk(base, func(path string, info fs.FileInfo, err error) error {
-			if info.IsDir() {
-				root := strings.TrimSuffix(base, f.Pkg)
-				relPath := strings.TrimPrefix(path, root)
-				importSpecs = append(importSpecs, resolve.ImportSpec{
-					Lang: lang.Name(),
-					Imp:  relPath,
-				})
-			}
-			return nil
-		})
+		subDirectories := make(map[string]bool)
+		for _, src := range srcs {
+			dir := filepath.Dir(src)
+			subDirectories[dir] = true
+		}
+		for subDirectory, _ := range subDirectories {
+			root := strings.TrimSuffix(base, f.Pkg)
+			relPath := strings.TrimPrefix(subDirectory, root)
+			path := fmt.Sprintf("%s/%s", f.Pkg, relPath)
+			importSpecs = append(importSpecs, resolve.ImportSpec{
+				Lang: lang.Name(),
+				Imp:  path,
+			})
+		}
 	}
 
 	return importSpecs
@@ -187,13 +189,28 @@ func (lang *JS) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Remote
 			continue
 		}
 
+		// fix aliases
+		match := jsConfig.ImportAliasPattern.FindStringSubmatch(name)
+		if len(match) > 0 {
+			prefix := match[0]
+			alias := ""
+			for _, impAlias := range jsConfig.ImportAliases {
+				if impAlias.From == prefix {
+					alias = impAlias.To
+					break
+				}
+			}
+
+			name = alias + strings.TrimPrefix(name, prefix)
+		}
+
 		// is it an npm dependency?
 		isNpm, npmLabel, devDep := lang.isNpmDependency(name, jsConfig)
 		if isNpm {
 
 			s := strings.Split(name, "/")
 			name = s[0]
-			if strings.HasPrefix(name, "@") {
+			if strings.HasPrefix(name, "@") && len(s) >= 2 {
 				name += "/" + s[1]
 			}
 			depSet[fmt.Sprintf("%s%s", npmLabel, name)] = true
@@ -214,6 +231,15 @@ func (lang *JS) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Remote
 		}
 
 		// is it a builtin?
+		if strings.HasPrefix(name, "node:") {
+			if jsConfig.LookupTypes && r.Kind() == "ts_project" {
+				typesFound, npmLabel, _ := lang.isNpmDependency("@types/node", jsConfig)
+				if typesFound {
+					depSet[fmt.Sprintf("%s@types/node", npmLabel)] = true
+				}
+			}
+			continue
+		}
 		if _, ok := BUILTINS[name]; ok {
 			// add @types/node when using node.js builtin and have @types/nodes installed
 			if jsConfig.LookupTypes && r.Kind() == "ts_project" {
@@ -235,16 +261,8 @@ func (lang *JS) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Remote
 			depSet[dep] = true
 			continue
 		}
-		// fix aliases
-		match := jsConfig.ImportAliasPattern.FindStringSubmatch(name)
-		if len(match) > 0 {
-			prefix := match[0]
-			alias := jsConfig.ImportAliases[prefix]
-			name = alias + strings.TrimPrefix(name, prefix)
-		}
 
 		lang.resolveWalkParents(name, depSet, dataSet, c, ix, rc, r, from)
-
 	}
 
 	// Add in additional jest dependencies
