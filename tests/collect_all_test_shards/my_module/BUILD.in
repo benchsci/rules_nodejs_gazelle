@@ -1,0 +1,3 @@
+# gazelle:js_collect_all
+# gazelle:js_jest_size small
+# gazelle:js_jest_test_per_shard 2

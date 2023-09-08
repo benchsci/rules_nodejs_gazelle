@@ -76,7 +76,7 @@ type JsConfig struct {
 	Verbose            bool
 	DefaultNpmLabel    string
 	JestConfig         string
-	JestShards         int
+	JestTestsPerShard  int
 	JestSize           string
 }
 
@@ -110,7 +110,7 @@ func NewJsConfig() *JsConfig {
 		Quiet:             false,
 		Verbose:           false,
 		DefaultNpmLabel:   "//:node_modules/",
-		JestShards:        -1,
+		JestTestsPerShard: -1,
 		JestConfig:        "",
 	}
 }
@@ -163,7 +163,7 @@ func (parent *JsConfig) NewChild() *JsConfig {
 	child.CollectAllRoot = parent.CollectAllRoot
 	child.CollectAllSources = parent.CollectAllSources // Copy reference, reinitialized on change to CollectAll
 
-	child.JestShards = parent.JestShards
+	child.JestTestsPerShard = parent.JestTestsPerShard
 	child.JestSize = parent.JestSize
 	child.JestConfig = parent.JestConfig
 
@@ -224,7 +224,7 @@ func (*JS) KnownDirectives() []string {
 		"js_collect_all_assets",
 		"js_aggregate_all_assets",
 		"js_collect_all",
-		"js_jest_shard_count",
+		"js_jest_test_per_shard",
 		"js_jest_size",
 		"js_jest_config",
 		"js_web_asset",
@@ -391,8 +391,8 @@ func (*JS) Configure(c *config.Config, rel string, f *rule.File) {
 			case "js_jest_config":
 				jsConfig.JestConfig = labels.ParseRelative(directive.Value, f.Pkg).Format()
 
-			case "js_jest_shard_count":
-				jsConfig.JestShards = readIntDirective(directive)
+			case "js_jest_test_per_shard":
+				jsConfig.JestTestsPerShard = readIntDirective(directive)
 
 			case "js_jest_size":
 				jsConfig.JestSize = directive.Value

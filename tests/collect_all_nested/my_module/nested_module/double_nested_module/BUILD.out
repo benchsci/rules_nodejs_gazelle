@@ -2,7 +2,6 @@ load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
 load("@rules_jest//jest:defs.bzl", "jest_test")
 
 # gazelle:js_collect_all
-# gazelle:js_jest_shard_count 2
 # gazelle:js_jest_size large
 
 jest_test(
@@ -14,7 +13,6 @@ jest_test(
     ],
     config = "//:jest.config",
     data = ["//:package_json"],
-    shard_count = 2,
 )
 
 ts_project(

@@ -2,17 +2,19 @@ load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
 load("@rules_jest//jest:defs.bzl", "jest_test")
 
 # gazelle:js_collect_all
-# gazelle:js_jest_size large
+# gazelle:js_jest_size small
+# gazelle:js_jest_test_per_shard 2
 
 jest_test(
     name = "my_module_test",
-    size = "large",
+    size = "small",
     srcs = [
         "nested_module/a.test.ts",
         "nested_module/b.test.ts",
     ],
     config = "//:jest.config",
     data = ["//:package_json"],
+    shard_count = 9,
 )
 
 ts_project(
