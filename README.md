@@ -232,4 +232,12 @@ The following directives are recognized by this plugin:
     <td colspan="2"><p dir="auto">Provide a default value for the <code>size</code> attribute of generated <code>jest_test</code> rules</p></td>
   </tr>
 
+  <tr>
+    <td><code># gazelle:js_jest_test_per_shard</code></td>
+    <td><code>none</code></td>
+  </tr>
+  <tr>
+    <td colspan="2"><p dir="auto">Provide a ratio of number of counted tests for each increment of the <code>shard_count</code> attribute of generated <code>jest_test</code> rules</p></td>
+  </tr>
+
 </tbody>

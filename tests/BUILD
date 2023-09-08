@@ -46,6 +46,7 @@ go_binary(
     for t in [
         "collect_all",
         "collect_all_nested",
+        "collect_all_test_shards",
         "collect_asset_modules",
         "collect_asset_singletons",
         "default_npm_label",

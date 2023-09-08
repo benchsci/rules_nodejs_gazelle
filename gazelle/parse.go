@@ -27,7 +27,7 @@ import (
 
 var quotePattern = regexp.MustCompile(`([/][/].*)|(?:[/][*](?:\n|.)*?[*][/])`)
 
-func ParseJS(data []byte) ([]string, error) {
+func ParseJS(data []byte) ([]string, int, error) {
 
 	lastCommentMatchIndex := 0
 	codeBlocks := make([][]int, 0)
@@ -38,16 +38,19 @@ func ParseJS(data []byte) ([]string, error) {
 	codeBlocks = append(codeBlocks, []int{lastCommentMatchIndex, len(data)})
 
 	imports := make([]string, 0)
+	jestTestCount := 0
 
 	for _, block := range codeBlocks {
-		blockImports, err := parseCodeBlock(data[block[0]:block[1]])
+		blockImports, blockTestCount, err := parseCodeBlock(data[block[0]:block[1]])
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		imports = append(imports, blockImports...)
+		jestTestCount += blockTestCount
 	}
+	sort.Strings(imports)
 
-	return imports, nil
+	return imports, jestTestCount, nil
 }
 
 const (
@@ -70,7 +73,9 @@ func compileJsImportPattern() *regexp.Regexp {
 	return regexp.MustCompile(`(?m)` + strings.Join([]string{importPattern, requirePattern, exportPattern, jestMockPattern, dynamicImportPattern}, "|"))
 }
 
-func parseCodeBlock(data []byte) ([]string, error) {
+var jestTestPattern = regexp.MustCompile(`(?m)^it\(`)
+
+func parseCodeBlock(data []byte) ([]string, int, error) {
 
 	imports := make([]string, 0)
 	for _, match := range jsImportPattern.FindAllSubmatch(data, -1) {
@@ -78,35 +83,35 @@ func parseCodeBlock(data []byte) ([]string, error) {
 		case match[IMPORT] != nil:
 			unquoted, err := unquoteImportString(match[IMPORT])
 			if err != nil {
-				return nil, fmt.Errorf("unquoting string literal %s from js, %v", match[IMPORT], err)
+				return nil, 0, fmt.Errorf("unquoting string literal %s from js, %v", match[IMPORT], err)
 			}
 			imports = append(imports, unquoted)
 
 		case match[REQUIRE] != nil:
 			unquoted, err := unquoteImportString(match[REQUIRE])
 			if err != nil {
-				return nil, fmt.Errorf("unquoting string literal %s from js, %v", match[REQUIRE], err)
+				return nil, 0, fmt.Errorf("unquoting string literal %s from js, %v", match[REQUIRE], err)
 			}
 			imports = append(imports, unquoted)
 
 		case match[EXPORT] != nil:
 			unquoted, err := unquoteImportString(match[EXPORT])
 			if err != nil {
-				return nil, fmt.Errorf("unquoting string literal %s from js, %v", match[EXPORT], err)
+				return nil, 0, fmt.Errorf("unquoting string literal %s from js, %v", match[EXPORT], err)
 			}
 			imports = append(imports, unquoted)
 
 		case match[JEST_MOCK] != nil:
 			unquoted, err := unquoteImportString(match[JEST_MOCK])
 			if err != nil {
-				return nil, fmt.Errorf("unquoting string literal %s from js, %v", match[JEST_MOCK], err)
+				return nil, 0, fmt.Errorf("unquoting string literal %s from js, %v", match[JEST_MOCK], err)
 			}
 			imports = append(imports, unquoted)
 
 		case match[DYNAMIC_IMPORT] != nil:
 			unquoted, err := unquoteImportString(match[DYNAMIC_IMPORT])
 			if err != nil {
-				return nil, fmt.Errorf("unquoting string literal %s from js, %v", match[DYNAMIC_IMPORT], err)
+				return nil, 0, fmt.Errorf("unquoting string literal %s from js, %v", match[DYNAMIC_IMPORT], err)
 			}
 			imports = append(imports, unquoted)
 
@@ -116,7 +121,9 @@ func parseCodeBlock(data []byte) ([]string, error) {
 	}
 	sort.Strings(imports)
 
-	return imports, nil
+	jestTestCount := len(jestTestPattern.FindAll(data, -1))
+
+	return imports, jestTestCount, nil
 }
 
 // unquoteImportString takes a string that has a complex quoting around it

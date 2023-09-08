@@ -1,3 +1,2 @@
 # gazelle:js_collect_all
-# gazelle:js_jest_shard_count 2
 # gazelle:js_jest_size large

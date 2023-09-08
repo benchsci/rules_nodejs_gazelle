@@ -19,6 +19,7 @@ package js
 import (
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"path"
 	"sort"
@@ -282,7 +283,7 @@ func (lang *JS) gatherFiles(args language.GenerateArgs, jsConfig *JsConfig) []st
 	return allFiles
 }
 
-func readFileAndParse(filePath string, rel string) *imports {
+func readFileAndParse(filePath string, rel string) (*imports, int) {
 
 	fileImports := imports{
 		set: make(map[string]bool),
@@ -298,7 +299,7 @@ func readFileAndParse(filePath string, rel string) *imports {
 	if err != nil {
 		log.Fatalf(Err("Error reading %s: %v", filePath, err))
 	}
-	jsImports, err := ParseJS(data)
+	jsImports, testCount, err := ParseJS(data)
 	if err != nil {
 		log.Fatalf(Err("Error parsing %s: %v", filePath, err))
 	}
@@ -309,7 +310,7 @@ func readFileAndParse(filePath string, rel string) *imports {
 		fileImports.set[imp] = true
 	}
 
-	return &fileImports
+	return &fileImports, testCount
 }
 
 func (lang *JS) genPkgRule(args language.GenerateArgs, jsConfig *JsConfig) *rule.Rule {
@@ -337,24 +338,16 @@ func (lang *JS) genJestTest(args language.GenerateArgs, jsConfig *JsConfig, jest
 			filePath := path.Join(args.Dir, baseName)
 			extension := match[0]
 
+			ruleName := strings.TrimSuffix(baseName, extension) + ".test"
 			r := rule.NewRule(
 				getKind(args.Config, "jest_test"),
-				strings.TrimSuffix(baseName, extension)+".test",
+				ruleName,
 			)
 			r.SetAttr("srcs", []string{baseName})
 
-			if jsConfig.JestConfig == "" && !jsConfig.Quiet {
-				log.Print(Warn("[%s/%s] no config for jest_test, use gazelle:js_jest_config directive", args.Rel, baseName))
-			}
-			r.SetAttr("config", jsConfig.JestConfig)
-			if jsConfig.JestSize != "" {
-				r.SetAttr("size", jsConfig.JestSize)
-			}
-			if len(jsConfig.Visibility.Labels) > 0 {
-				r.SetAttr("visibility", jsConfig.Visibility.Labels)
-			}
+			imports, jestTestCount := readFileAndParse(filePath, "")
 
-			imports := readFileAndParse(filePath, "")
+			lang.addJestAttributes(args, jsConfig, ruleName, r, jestTestCount)
 
 			generatedRules = append(generatedRules, r)
 			generatedImports = append(generatedImports, imports)
@@ -362,11 +355,14 @@ func (lang *JS) genJestTest(args language.GenerateArgs, jsConfig *JsConfig, jest
 
 	} else if len(jestSources) > 0 {
 		// Add all tests as a single rule
+		jestTestCount := 0
 		var allImports []imports
 		for _, baseName := range jestSources {
 			filePath := path.Join(args.Dir, baseName)
 			relativePart := path.Dir(baseName)
-			allImports = append(allImports, *readFileAndParse(filePath, relativePart))
+			imps, tCount := readFileAndParse(filePath, relativePart)
+			jestTestCount += tCount
+			allImports = append(allImports, *imps)
 		}
 		imports := flattenImports(allImports)
 
@@ -378,21 +374,7 @@ func (lang *JS) genJestTest(args language.GenerateArgs, jsConfig *JsConfig, jest
 		)
 
 		r.SetAttr("srcs", jestSources)
-
-		if jsConfig.JestConfig == "" {
-			log.Print(Err("[%s/%s] jest_test missing config, use gazelle:js_jest_config directive", args.Rel, ruleName))
-		}
-		r.SetAttr("config", jsConfig.JestConfig)
-		if jsConfig.JestShards > 0 {
-			r.SetAttr("shard_count", jsConfig.JestShards)
-		}
-		if jsConfig.JestSize != "" {
-			r.SetAttr("size", jsConfig.JestSize)
-		}
-		if len(jsConfig.Visibility.Labels) > 0 {
-			r.SetAttr("visibility", jsConfig.Visibility.Labels)
-		}
-
+		lang.addJestAttributes(args, jsConfig, ruleName, r, jestTestCount)
 		generatedRules = append(generatedRules, r)
 		generatedImports = append(generatedImports, imports)
 	}
@@ -407,15 +389,32 @@ type testRuleArgs struct {
 	baseName  string
 }
 
-func (lang *JS) makeFolderTestRule(args testRuleArgs, jsConfig *JsConfig) (*imports, *rule.Rule) {
-	imps := readFileAndParse(args.filePath, "")
-	ruleName := strings.TrimSuffix(args.baseName, args.extension) + ".test"
-	r := rule.NewRule(args.ruleType, ruleName)
-	r.SetAttr("srcs", []string{args.baseName})
+func (lang *JS) makeFolderTestRule(args language.GenerateArgs, jsConfig *JsConfig, testRuleArgs testRuleArgs) (*imports, *rule.Rule) {
+	imps, jestTestCount := readFileAndParse(testRuleArgs.filePath, "")
+	ruleName := strings.TrimSuffix(testRuleArgs.baseName, testRuleArgs.extension) + ".test"
+	r := rule.NewRule(testRuleArgs.ruleType, ruleName)
+	r.SetAttr("srcs", []string{testRuleArgs.baseName})
+	lang.addJestAttributes(args, jsConfig, ruleName, r, jestTestCount)
+	return imps, r
+}
+
+func (lang *JS) addJestAttributes(args language.GenerateArgs, jsConfig *JsConfig, baseName string, r *rule.Rule, jestTestCount int) {
+	if jsConfig.JestConfig == "" && !jsConfig.Quiet {
+		log.Print(Warn("[%s/%s] no config for jest_test, use gazelle:js_jest_config directive", args.Rel, baseName))
+	}
+	r.SetAttr("config", jsConfig.JestConfig)
+	if jsConfig.JestTestsPerShard > 0 {
+		shardCount := int(math.Ceil(float64(jestTestCount) / float64(jsConfig.JestTestsPerShard)))
+		if shardCount > 1 {
+			r.SetAttr("shard_count", shardCount)
+		}
+	}
+	if jsConfig.JestSize != "" {
+		r.SetAttr("size", jsConfig.JestSize)
+	}
 	if len(jsConfig.Visibility.Labels) > 0 {
 		r.SetAttr("visibility", jsConfig.Visibility.Labels)
 	}
-	return imps, r
 }
 
 func (lang *JS) genRules(args language.GenerateArgs, jsConfig *JsConfig, isBarrel bool, isJSRoot bool, pkgName string, sources []string, appendTSExt bool, kind string) ([]*rule.Rule, []interface{}) {
@@ -428,7 +427,8 @@ func (lang *JS) genRules(args language.GenerateArgs, jsConfig *JsConfig, isBarre
 		if jsConfig.CollectAll {
 			relativePart = path.Dir(baseName)
 		}
-		imports = append(imports, *readFileAndParse(filePath, relativePart))
+		imps, _ := readFileAndParse(filePath, relativePart)
+		imports = append(imports, *imps)
 	}
 
 	collectBarrel := jsConfig.CollectBarrels && isBarrel && !isJSRoot

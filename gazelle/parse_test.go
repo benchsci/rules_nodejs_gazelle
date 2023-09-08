@@ -141,7 +141,7 @@ if (process.ENV.SHOULD_IMPORT) {
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 
-			imports, err := ParseJS([]byte(tc.js))
+			imports, _, err := ParseJS([]byte(tc.js))
 			if err != nil {
 				t.Error(err)
 				t.FailNow()
