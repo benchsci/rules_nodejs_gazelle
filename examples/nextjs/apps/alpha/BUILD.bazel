@@ -12,6 +12,8 @@ load("//bazel:next.bzl", "next")
 
 # gazelle:js_package_file package.json :node_modules
 # gazelle:js_jest_config :jest.config
+# gazelle:js_jest_test_per_shard 25
+
 # gazelle:js_root
 
 # gazelle:js_visibility //apps/alpha:__subpackages__
