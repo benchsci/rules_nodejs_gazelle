@@ -73,7 +73,7 @@ func compileJsImportPattern() *regexp.Regexp {
 	return regexp.MustCompile(`(?m)` + strings.Join([]string{importPattern, requirePattern, exportPattern, jestMockPattern, dynamicImportPattern}, "|"))
 }
 
-var jestTestPattern = regexp.MustCompile(`(?m)^it\(`)
+var jestTestPattern = regexp.MustCompile(`(?m)^\s*it\(`)
 
 func parseCodeBlock(data []byte) ([]string, int, error) {
 
