@@ -94,14 +94,13 @@ go_register_toolchains(version = "1.19")
 
 gazelle_dependencies()
 
-# For generating BUILD files
+# Get the latest release from https://github.com/benchsci/rules_nodejs_gazelle/releases
 # http_archive(
 #     name = "com_github_benchsci_rules_nodejs_gazelle",
-#     sha256 = "c8f9834e58bfef0dde486cdd8179fff9e14177df2c1faad6ea8cd5018327788d",
-#     strip_prefix = "rules_nodejs_gazelle-1448dad46d854bbdff7b58093136f584feeb1073",
+#     sha256 = "************",
+#     strip_prefix = "rules_nodejs_gazelle-0.4.0",
 #     urls = [
-#         "https://github.com/benchsci/rules_nodejs_gazelle/archive/1448dad46d854bbdff7b58093136f584feeb1073.tar.gz",
-#         "https://storage.googleapis.com/bsci-thirdparty/benchsci/rules_nodejs_gazelle/archive/1448dad46d854bbdff7b58093136f584feeb1073.tar.gz",
+#         "https://github.com/benchsci/rules_nodejs_gazelle/archive/refs/tags/v0.4.0.tar.gz",
 #     ],
 # )
 local_repository(
