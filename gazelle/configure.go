@@ -192,11 +192,22 @@ func (v *Visibility) Set(value string) error {
 	return nil
 }
 
+func newJsConfigsWithRootConfig() JsConfigs {
+	rootConfig := NewJsConfig()
+	rootConfig.JSRoot = "."
+	rootConfig.CollectedAssets = make(map[string]bool)
+	return JsConfigs{
+		"": rootConfig,
+	}
+}
+
 // RegisterFlags registers command-line flags used by the extension. This
 // method is called once with the root configuration when Gazelle
 // starts. RegisterFlags may set an initial values in Config.Exts. When flags
 // are set, they should modify these values.
-func (lang *JS) RegisterFlags(fs *flag.FlagSet, cmd string, c *config.Config) {}
+func (lang *JS) RegisterFlags(fs *flag.FlagSet, cmd string, c *config.Config) {
+	c.Exts[languageName] = newJsConfigsWithRootConfig()
+}
 
 // CheckFlags validates the configuration after command line flags are parsed.
 // This is called once with the root configuration when Gazelle starts.
@@ -249,12 +260,7 @@ func (*JS) Configure(c *config.Config, rel string, f *rule.File) {
 
 	// Create the root config.
 	if _, exists := c.Exts[languageName]; !exists {
-		rootConfig := NewJsConfig()
-		rootConfig.JSRoot = "."
-		rootConfig.CollectedAssets = make(map[string]bool)
-		c.Exts[languageName] = JsConfigs{
-			"": rootConfig,
-		}
+		c.Exts[languageName] = newJsConfigsWithRootConfig()
 	}
 
 	jsConfigs := c.Exts[languageName].(JsConfigs)
