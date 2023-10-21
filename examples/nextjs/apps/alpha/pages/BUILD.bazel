@@ -33,15 +33,6 @@ jest_test(
     srcs = ["index.test.tsx"],
     config = "//apps/alpha:jest.config",
     data = [
-        "//:node_modules/@testing-library/jest-dom",
-        "//:node_modules/@testing-library/react",
-        "//:node_modules/jest-environment-jsdom",
-        "//:node_modules/jest-transform-stub",
-        "//:node_modules/react",
-        "//apps/alpha:package_json",
-    ],
-    visibility = ["//apps/alpha:__subpackages__"],
-    deps = [
         ":pages",
         "//:node_modules/@testing-library/jest-dom",
         "//:node_modules/@testing-library/react",
@@ -49,5 +40,7 @@ jest_test(
         "//:node_modules/jest-environment-jsdom",
         "//:node_modules/jest-transform-stub",
         "//:node_modules/react",
+        "//apps/alpha:package_json",
     ],
+    visibility = ["//apps/alpha:__subpackages__"],
 )
