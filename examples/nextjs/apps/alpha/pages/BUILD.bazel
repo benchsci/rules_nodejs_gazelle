@@ -42,6 +42,7 @@ jest_test(
         "//:node_modules/react",
         "//apps/alpha:package_json",
     ],
+    snapshots = ["__snapshots__"],
     visibility = ["//apps/alpha:__subpackages__"],
     deps = [
         ":pages",
