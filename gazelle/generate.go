@@ -350,7 +350,7 @@ func (lang *JS) genJestTest(args language.GenerateArgs, jsConfig *JsConfig, jest
 			var collectedSnapshots []string
 			snapshotFile, err := os.Stat(path.Join(args.Dir, "__snapshots__", baseName+".snap"))
 			if err == nil && snapshotFile.Mode().IsRegular() {
-				collectedSnapshots = append(collectedSnapshots, path.Join(args.Dir, "__snapshots__", baseName+".snap"))
+				collectedSnapshots = append(collectedSnapshots, path.Join("__snapshots__", baseName+".snap"))
 			}
 
 			lang.addJestAttributes(args, jsConfig, ruleName, r, jestTestCount, collectedSnapshots)

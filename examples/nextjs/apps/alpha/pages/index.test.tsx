@@ -19,7 +19,7 @@ describe('Home', () => {
 
 describe('snapshot', () => {
   it('works', () => {
-    const constainer = render(<Home />);
-    expect(constainer).toMatchSnapshot();
+    const { asFragment } = render(<Home />);
+    expect(asFragment()).toMatchSnapshot();
   });
 });
