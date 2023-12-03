@@ -30,4 +30,5 @@ ts_project(
 ts_project(
     name = "builtin",
     srcs = ["builtin.ts"],
+    deps = ["//:node_modules/@types/node"],
 )

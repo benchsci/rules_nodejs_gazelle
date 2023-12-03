@@ -231,22 +231,12 @@ func (lang *JS) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Remote
 		}
 
 		// is it a builtin?
-		if strings.HasPrefix(name, "node:") {
+		if _, ok := BUILTINS[name]; ok || strings.HasPrefix(name, "node:") {
+			// add @types/node when using node.js builtin and have @types/nodes installed
 			if jsConfig.LookupTypes && r.Kind() == "ts_project" {
 				typesFound, npmLabel, _ := lang.isNpmDependency("@types/node", jsConfig)
 				if typesFound {
 					depSet[fmt.Sprintf("%s@types/node", npmLabel)] = true
-				}
-			}
-			continue
-		}
-		if _, ok := BUILTINS[name]; ok {
-			// add @types/node when using node.js builtin and have @types/nodes installed
-			if jsConfig.LookupTypes && r.Kind() == "ts_project" {
-				// does it have a corresponding @types/[...] declaration?
-				typesFound, npmLabel, _ := lang.isNpmDependency("@types/"+name, jsConfig)
-				if typesFound {
-					depSet[fmt.Sprintf("%s@types/%s", npmLabel, name)] = true
 				}
 			}
 			continue
