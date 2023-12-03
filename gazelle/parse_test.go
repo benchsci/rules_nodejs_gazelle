@@ -56,6 +56,16 @@ func TestParseJS(t *testing.T) {
 import Puppy from '@/components/Puppy';`,
 			want: []string{"@/components/Puppy", "date-fns"},
 		}, {
+			desc: "import dynamic",
+			name: "dynamic.ts",
+			js:   `let lamdba = () => import('./b').do_something("something")`,
+			want: []string{"./b"},
+		}, {
+			desc: "import special chars",
+			name: "page.js",
+			js:   `import BlogPage from "@/app/(auth)/blog/[slug]/page";`,
+			want: []string{"@/app/(auth)/blog/[slug]/page"},
+		}, {
 			desc: "import depth",
 			name: "deep.sass",
 			js:   `import package from "from/internal/package";`,

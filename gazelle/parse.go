@@ -64,7 +64,7 @@ const (
 var jsImportPattern = compileJsImportPattern()
 
 func compileJsImportPattern() *regexp.Regexp {
-	stringLiteralPattern := `'(?:[^)\n]+|")*'|"(?:[^)\n]+|')*"`
+	stringLiteralPattern := `'(?:[^\n]+|")*'|"(?:[^\n]+|')*"`
 	importPattern := `^import\s(?:(?:.|\n)+?from )??(?P<import>` + stringLiteralPattern + `)`
 	requirePattern := `^\s*?(?:const .+ = )?require\((?P<require>` + stringLiteralPattern + `)\)`
 	exportPattern := `^export\s(?:(?:.|\n)+?from )??(?P<export>` + stringLiteralPattern + `)`
