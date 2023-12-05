@@ -257,21 +257,20 @@ func (lang *JS) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Remote
 
 	// Add in additional jest dependencies
 	if r.Kind() == getKind(c, "jest_test") {
-		// All deps are dataDeps for jest_test rules
+		// All deps are also data for jest_test rules.
 		for name := range depSet {
 			dataSet[name] = true
 		}
-		// Reset the depSet since we don't need it.
-		depSet = make(map[string]bool)
-
 		for name, npmLabel := range jsConfig.NpmDependencies.DevDependencies {
 			if name == "jest-cli" || name == "jest-junit" {
 				continue
 			}
 			if strings.HasPrefix(name, "@types/jest") {
+				depSet[fmt.Sprintf("%s%s", npmLabel, name)] = true
 				dataSet[fmt.Sprintf("%s%s", npmLabel, name)] = true
 			}
 			if strings.HasPrefix(name, "jest") {
+				depSet[fmt.Sprintf("%s%s", npmLabel, name)] = true
 				dataSet[fmt.Sprintf("%s%s", npmLabel, name)] = true
 			}
 		}
