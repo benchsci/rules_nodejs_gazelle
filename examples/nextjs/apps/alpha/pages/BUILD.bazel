@@ -43,4 +43,13 @@ jest_test(
         "//apps/alpha:package_json",
     ],
     visibility = ["//apps/alpha:__subpackages__"],
+    deps = [
+        ":pages",
+        "//:node_modules/@testing-library/jest-dom",
+        "//:node_modules/@testing-library/react",
+        "//:node_modules/@types/jest",
+        "//:node_modules/jest-environment-jsdom",
+        "//:node_modules/jest-transform-stub",
+        "//:node_modules/react",
+    ],
 )
