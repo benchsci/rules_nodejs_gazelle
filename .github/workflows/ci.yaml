@@ -33,3 +33,24 @@ jobs:
                   # Bazelisk will download bazel to here
                   XDG_CACHE_HOME: ~/.cache/bazel-repo
               run: bazel test //...
+    test_bzlmod:
+        # The type of runner that the job will run on
+        runs-on: ubuntu-latest
+
+        # Steps represent a sequence of tasks that will be executed as part of the job
+        steps:
+            # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+            - uses: actions/checkout@v2
+            - name: Mount bazel caches
+              uses: actions/cache@v2
+              with:
+                  path: |
+                      "~/.cache/bazel"
+                      "~/.cache/bazel-repo"
+                  key: bazel-cache-${{ hashFiles('**/BUILD.bazel', '**/*.bzl', 'WORKSPACE', '**/*.js') }}
+                  restore-keys: bazel-cache-
+            - name: bazel test //... --enable_bzlmod
+              env:
+                  # Bazelisk will download bazel to here
+                  XDG_CACHE_HOME: ~/.cache/bazel-repo
+              run: bazel test //... --enable_bzlmod
