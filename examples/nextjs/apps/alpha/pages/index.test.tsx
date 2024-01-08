@@ -16,3 +16,10 @@ describe('Home', () => {
     expect(heading).toBeInTheDocument();
   });
 });
+
+describe('snapshot', () => {
+  it('works', () => {
+    const { asFragment } = render(<Home />);
+    expect(asFragment()).toMatchSnapshot();
+  });
+});
