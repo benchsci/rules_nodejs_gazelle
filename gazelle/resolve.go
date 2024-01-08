@@ -418,8 +418,8 @@ func (lang *JS) isNpmDependency(imp string, jsConfig *JsConfig) (bool, string, b
 	}
 
 	// Assume all @ imports are npm dependencies
-	if strings.HasPrefix(imp, "@types") {
-		// Need to ignore @types, since these are checked greedily
+	if strings.HasPrefix(imp, "@types/") {
+		// Need to ignore @types/, since these are checked greedily
 		return false, "", false
 	}
 	if strings.HasPrefix(imp, "@") {
