@@ -25,10 +25,10 @@ Then add this repository to your `WORKSPACE` file:
 ```starlark
 http_archive(
     name = "com_github_benchsci_rules_nodejs_gazelle",
-    sha256 = "************",
-    strip_prefix = "rules_nodejs_gazelle-0.4.0",
+    sha256 = "c3734c1d4f18f58c74e1efb1ab83dd2bed84d0de2e0b26c8c0fcb649bdbb75a1",
+    strip_prefix = "rules_nodejs_gazelle-0.5.0",
     urls = [
-        "https://github.com/benchsci/rules_nodejs_gazelle/archive/refs/tags/v0.4.0.tar.gz",
+        "https://github.com/benchsci/rules_nodejs_gazelle/archive/refs/tags/v0.5.0.tar.gz",
     ],
 )
 ```
