@@ -27,7 +27,7 @@ jobs:
                   # Bazel will download bazel to here
                   XDG_CACHE_HOME: ~/.cache/bazel-repo
               run: bazel test //...
-            - name: Prepare workspace snippet
+            - name: Prepare Release
               run: .github/workflows/workspace_snippet.sh ${{ env.GITHUB_REF_NAME }} > release_notes.txt
             - name: Release
               uses: benchsci/action-gh-release@v1
@@ -35,3 +35,6 @@ jobs:
                   # Use GH feature to populate the changelog automatically
                   generate_release_notes: true
                   body_path: release_notes.txt
+                  files: rules_nodejs_gazelle-*.tar.gz
+                  fail_on_unmatched_files: true
+
