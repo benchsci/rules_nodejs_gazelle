@@ -54,8 +54,8 @@ npm_translate_lock(
             "next": "./dist/bin/next",
         },
     },
-    pnpm_lock = "//:pnpm-lock.yaml",
     npmrc = "//:.npmrc",
+    pnpm_lock = "//:pnpm-lock.yaml",
     verify_node_modules_ignored = "//:.bazelignore",
 )
 

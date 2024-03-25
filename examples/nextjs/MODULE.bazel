@@ -1,0 +1,55 @@
+module(
+    name = "e2e_rules_nodejs_gazelle",
+    version = "0.0.0",
+    compatibility_level = 1,
+)
+
+bazel_dep(name = "aspect_rules_js", version = "1.27.0")
+bazel_dep(name = "gazelle", version = "0.34.0", repo_name = "bazel_gazelle")
+bazel_dep(name = "rules_go", version = "0.42.0", repo_name = "io_bazel_rules_go")
+bazel_dep(name = "bazel_skylib", version = "1.4.1")
+bazel_dep(name = "aspect_rules_ts", version = "1.4.0")
+bazel_dep(name = "aspect_rules_jest", version = "0.0.0", repo_name = "aspect_rules_jest")
+bazel_dep(name = "com_github_benchsci_rules_nodejs_gazelle", version = "0.0.0", repo_name = "com_github_benchsci_rules_nodejs_gazelle")
+local_path_override(
+    module_name = "com_github_benchsci_rules_nodejs_gazelle",
+    path = "../..",
+)
+
+npm = use_extension(
+    "@aspect_rules_js//npm:extensions.bzl",
+    "npm",
+    dev_dependency = True,
+)
+npm.npm_translate_lock(
+    name = "npm",
+    bins = {
+        # derived from "bin" attribute in node_modules/next/package.json
+        "next": [
+            "next=./dist/bin/next",
+        ],
+    },
+    # Test that lifecycle hooks can resolve node, npm as well as dep bins on that PATH.
+    # This e2e test is run on Windows as well so this test coverage is here for now. Once
+    # Windows CI runs on the root WORKSPACE, coverage can be moved there.
+    # See https://github.com/aspect-build/rules_js/pull/1142 for more info.
+    npmrc = "//:.npmrc",
+    pnpm_lock = "//:pnpm-lock.yaml",
+    verify_node_modules_ignored = "//:.bazelignore",
+)
+use_repo(npm, "npm")
+
+rules_ts_ext = use_extension(
+    "@aspect_rules_ts//ts:extensions.bzl",
+    "ext",
+    dev_dependency = True,
+)
+rules_ts_ext.deps()
+use_repo(rules_ts_ext, "npm_typescript")
+
+archive_override(
+    module_name = "aspect_rules_jest",
+    integrity = "sha256-F1+SRIvRGzmO6UxrsJyr9233WnfSHJVVcjeYxYouc8g=",
+    strip_prefix = "rules_jest-0.19.2",
+    urls = ["https://github.com/aspect-build/rules_jest/releases/download/v0.19.2/rules_jest-v0.19.2.tar.gz"],
+)
