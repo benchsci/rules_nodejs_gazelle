@@ -8,5 +8,5 @@ bcr_test_module:
             name: 'Run test module'
             bazel: ${{ bazel }}
             platform: ${{ platform }}
-            test_targets:
-                - '//apps/alpha/...'
+            run_targets:
+              - '//:gazelle'
