@@ -1,0 +1,17 @@
+load("@aspect_rules_js//js:defs.bzl", "js_library")
+load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
+
+# gazelle:js_package_file package.json :node_modules
+# gazelle:js_collect_all
+
+js_library(
+    name = "package_json",
+    srcs = ["package.json"],
+)
+
+ts_project(
+    name = "project_a",
+    srcs = ["a.ts"],
+    data = ["//project_a:node_modules/@emotion/react"],
+    deps = ["//project_a:node_modules/@emotion/react"],
+)

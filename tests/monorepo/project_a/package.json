@@ -1,0 +1,8 @@
+{
+  "name": "monorepo_project_a", 
+  "description": "A test case",
+  "version": "0.0.0",
+  "dependencies": {
+    "@emotion/react": "11.11.4"
+  }
+}

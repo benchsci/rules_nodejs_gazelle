@@ -1,0 +1,7 @@
+{
+  "name": "monorepo",
+  "description": "A test case",
+  "version": "0.0.0",
+  "dependencies": {
+  }
+}
