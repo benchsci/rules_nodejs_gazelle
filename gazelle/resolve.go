@@ -413,7 +413,16 @@ func (lang *JS) isNpmDependency(imp string, jsConfig *JsConfig) (bool, string, b
 		return true, npmLabel, false
 	}
 
+	// Is the original package found in package.json ?
+	if npmLabel, ok := jsConfig.NpmDependencies.Dependencies[imp]; ok {
+		return true, npmLabel, false
+	}
+
 	if npmLabel, ok := jsConfig.NpmDependencies.DevDependencies[packageRoot]; ok {
+		return true, npmLabel, true
+	}
+
+	if npmLabel, ok := jsConfig.NpmDependencies.DevDependencies[imp]; ok {
 		return true, npmLabel, true
 	}
 

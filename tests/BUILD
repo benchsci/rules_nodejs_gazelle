@@ -66,5 +66,6 @@ go_binary(
         "ts_conversion",
         "visibility",
         "web_assets_module",
+        "monorepo",
     ]
 ]
