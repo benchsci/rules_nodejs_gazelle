@@ -1,0 +1,13 @@
+load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
+
+# gazelle:js_root
+# gazelle:js_verbose
+
+ts_project(
+    name = "index",
+    srcs = ["index.ts"],
+    deps = [
+        "//src/pages",  # keep
+        "//src/pages2",  # keep
+    ],
+)

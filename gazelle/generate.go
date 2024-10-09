@@ -113,7 +113,33 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		return language.GenerateResult{}
 	}
 
-	if jsConfig.CollectAll && jsConfig.CollectAllRoot != args.Rel {
+	if jsConfig.CollectPages || jsConfig.CollectPageFiles {
+
+		var pagesDepth = len(strings.Split(jsConfig.NextPagesRoot, "/"))
+		var selfDepth = len(strings.Split(args.Rel, "/"))
+
+		if pagesDepth <= selfDepth-2 {
+
+			// if we are at more than one level deeper, then collect all files for the page
+			for _, fileName := range args.RegularFiles {
+
+				path := strings.TrimPrefix(
+					strings.TrimPrefix(
+						path.Join(args.Rel, fileName),
+						jsConfig.NextPagesRoot,
+					),
+					"/",
+				)
+
+				// Still one level deeper, so we need to remove the first part of the path
+				path = strings.Join(strings.Split(path, "/")[1:], "/")
+
+				jsConfig.CollectedPageFiles[path] = true
+			}
+			return language.GenerateResult{}
+		}
+
+	} else if jsConfig.CollectAll && jsConfig.CollectAllRoot != args.Rel {
 		// collect all files in this directory for use in parent rules
 		for _, fileName := range args.RegularFiles {
 			path := strings.TrimPrefix(
@@ -133,14 +159,9 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 	generatedRules := make([]*rule.Rule, 0)
 	generatedImports := make([]interface{}, 0)
 
-	var jestSources,
-		tsSources,
-		jsSources,
-		webAssetsSet,
-		isBarrel,
-		isJSRoot = lang.collectSources(args, jsConfig)
+	var sources = lang.collectSources(args, jsConfig)
 
-	if !jsConfig.Quiet && isBarrel && len(tsSources) > 0 && len(jsSources) > 0 {
+	if !jsConfig.Quiet && sources.isBarrel && len(sources.tsSources) > 0 && len(sources.jsSources) > 0 {
 		log.Print(Warn("[WARN] ts and js files mixed in package %s", pkgName))
 	}
 
@@ -152,40 +173,87 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 	}
 
 	// add "jest_test" rule(s)
-	generatedTestRules, generatedTestImports := lang.genJestTest(args, jsConfig, jestSources)
+	generatedTestRules, generatedTestImports := lang.genJestTest(args, jsConfig, sources.jestSources)
 	generatedRules = append(generatedRules, generatedTestRules...)
 	generatedImports = append(generatedImports, generatedTestImports...)
 
-	appendTSExt := len(jsSources) > 0
+	appendTSExt := len(sources.jsSources) > 0
 
-	if len(jsSources) > 0 && jsConfig.CollectAll {
+	absJSRoot := path.Join(args.Config.RepoRoot, jsConfig.JSRoot)
+	isJSRoot := absJSRoot == args.Dir
+
+	if len(sources.jsSources) > 0 && (jsConfig.CollectAll || jsConfig.CollectPageFiles) {
 		// add combined "ts_project" rule with js sources
-		generatedTSRules, generatedTSImports := lang.genRules(args, jsConfig, isBarrel, isJSRoot, pkgName, append(tsSources, jsSources...), false, "ts_project")
+		generatedTSRules, generatedTSImports := lang.genRules(
+			args,
+			jsConfig,
+			sources.isBarrel,
+			isJSRoot,
+			pkgName,
+			append(sources.tsSources, sources.jsSources...),
+			false,
+			"ts_project",
+		)
 		generatedRules = append(generatedRules, generatedTSRules...)
 		generatedImports = append(generatedImports, generatedTSImports...)
 
 	} else {
 		// add "ts_project" rule(s)
-		generatedTSRules, generatedTSImports := lang.genRules(args, jsConfig, isBarrel, isJSRoot, pkgName, tsSources, appendTSExt, "ts_project")
+		generatedTSRules, generatedTSImports := lang.genRules(
+			args,
+			jsConfig,
+			sources.isBarrel,
+			isJSRoot,
+			pkgName,
+			sources.tsSources,
+			appendTSExt,
+			"ts_project",
+		)
 		generatedRules = append(generatedRules, generatedTSRules...)
 		generatedImports = append(generatedImports, generatedTSImports...)
 
 		// add "js_library" rule(s)
 		appendTSExt = false
-		generatedJSRules, generatedJSImports := lang.genRules(args, jsConfig, isBarrel, isJSRoot, pkgName, jsSources, appendTSExt, "js_library")
+		generatedJSRules, generatedJSImports := lang.genRules(
+			args,
+			jsConfig,
+			sources.isBarrel,
+			isJSRoot,
+			pkgName,
+			sources.jsSources,
+			appendTSExt,
+			"js_library",
+		)
 		generatedRules = append(generatedRules, generatedJSRules...)
 		generatedImports = append(generatedImports, generatedJSImports...)
 	}
 
 	// add "web_assets" rule(s)
-	generatedWARules, generatedWAImports := lang.genWebAssets(args, webAssetsSet, jsConfig)
+	generatedWARules, generatedWAImports := lang.genWebAssets(
+		args,
+		sources.webAssetsSet,
+		jsConfig,
+	)
 	generatedRules = append(generatedRules, generatedWARules...)
 	generatedImports = append(generatedImports, generatedWAImports...)
 
 	// add "all_assets" "web_assets" rule
-	generatedAWARules, generatedAWAImports := lang.genAllAssets(args, isJSRoot, jsConfig)
+	generatedAWARules, generatedAWAImports := lang.genAllAssets(
+		args,
+		isJSRoot,
+		jsConfig,
+	)
 	generatedRules = append(generatedRules, generatedAWARules...)
 	generatedImports = append(generatedImports, generatedAWAImports...)
+
+	generatedTSRules, generatedTSImports := lang.genEmptyPageRule(
+		args,
+		jsConfig,
+		pkgName,
+		append(sources.tsSources, sources.jsSources...),
+	)
+	generatedRules = append(generatedRules, generatedTSRules...)
+	generatedImports = append(generatedImports, generatedTSImports...)
 
 	existingRules := lang.readExistingRules(args, true)
 	lang.pruneManagedRules(existingRules, generatedRules)
@@ -197,7 +265,15 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 	}
 }
 
-func (lang *JS) collectSources(args language.GenerateArgs, jsConfig *JsConfig) ([]string, []string, []string, map[string]bool, bool, bool) {
+type collectedSources struct {
+	jestSources  []string
+	tsSources    []string
+	jsSources    []string
+	webAssetsSet map[string]bool
+	isBarrel     bool
+}
+
+func (lang *JS) collectSources(args language.GenerateArgs, jsConfig *JsConfig) collectedSources {
 
 	managedFiles := make(map[string]bool)
 	jestSources := []string{}
@@ -206,9 +282,6 @@ func (lang *JS) collectSources(args language.GenerateArgs, jsConfig *JsConfig) (
 	webAssetsSet := make(map[string]bool)
 
 	isBarrel := false
-
-	absJSRoot := path.Join(args.Config.RepoRoot, jsConfig.JSRoot)
-	isJSRoot := absJSRoot == args.Dir
 
 	for _, baseName := range lang.gatherFiles(args, jsConfig) {
 
@@ -256,12 +329,13 @@ func (lang *JS) collectSources(args language.GenerateArgs, jsConfig *JsConfig) (
 
 	}
 
-	return jestSources,
-		tsSources,
-		jsSources,
-		webAssetsSet,
-		isBarrel,
-		isJSRoot
+	return collectedSources{
+		jestSources:  jestSources,
+		tsSources:    tsSources,
+		jsSources:    jsSources,
+		webAssetsSet: webAssetsSet,
+		isBarrel:     isBarrel,
+	}
 }
 
 func (lang *JS) isWebAsset(jsConfig *JsConfig, baseName string) bool {
@@ -276,7 +350,12 @@ func (lang *JS) isWebAsset(jsConfig *JsConfig, baseName string) bool {
 func (lang *JS) gatherFiles(args language.GenerateArgs, jsConfig *JsConfig) []string {
 	allFiles := args.RegularFiles
 	if jsConfig.CollectAll {
-		for file, _ := range jsConfig.CollectAllSources {
+		for file := range jsConfig.CollectAllSources {
+			allFiles = append(allFiles, file)
+		}
+	}
+	if jsConfig.CollectPageFiles {
+		for file := range jsConfig.CollectedPageFiles {
 			allFiles = append(allFiles, file)
 		}
 	}
@@ -297,11 +376,11 @@ func readFileAndParse(filePath string, rel string) (*imports, int) {
 
 	data, err := os.ReadFile(filePath)
 	if err != nil {
-		log.Fatalf(Err("Error reading %s: %v", filePath, err))
+		log.Fatal(Err("Error reading %s: %v", filePath, err))
 	}
 	jsImports, testCount, err := ParseJS(data)
 	if err != nil {
-		log.Fatalf(Err("Error parsing %s: %v", filePath, err))
+		log.Fatal(Err("Error parsing %s: %v", filePath, err))
 	}
 	for _, imp := range jsImports {
 		if rel != "" && strings.HasPrefix(imp, ".") {
@@ -394,13 +473,6 @@ func (lang *JS) genJestTest(args language.GenerateArgs, jsConfig *JsConfig, jest
 	return generatedRules, generatedImports
 }
 
-type testRuleArgs struct {
-	ruleType  string
-	extension string
-	filePath  string
-	baseName  string
-}
-
 func (lang *JS) addJestAttributes(args language.GenerateArgs, jsConfig *JsConfig, baseName string, r *rule.Rule, jestTestCount int, collectedSnapshots []string) {
 	if jsConfig.JestConfig == "" && !jsConfig.Quiet {
 		log.Print(Warn("[%s/%s] no config for jest_test, use gazelle:js_jest_config directive", args.Rel, baseName))
@@ -449,7 +521,7 @@ func (lang *JS) genRules(args language.GenerateArgs, jsConfig *JsConfig, isBarre
 		if appendTSExt {
 			name = name + "_ts"
 		}
-		if jsConfig.CollectAll {
+		if jsConfig.CollectAll || jsConfig.CollectPages || jsConfig.CollectPageFiles {
 			// add as a folder
 			for _, existingRule := range lang.readExistingRules(args, false) {
 				// Look for existing rules with the same name, but different kind
@@ -469,6 +541,12 @@ func (lang *JS) genRules(args language.GenerateArgs, jsConfig *JsConfig, isBarre
 				srcs:     sources,
 				imports:  imports,
 			}, jsConfig)
+
+			if jsConfig.CollectPageFiles {
+				// record this rule as a page
+				fqName := fmt.Sprintf("//%s:%s", path.Join(args.Rel), name)
+				jsConfig.CollectedPages[fqName] = true
+			}
 			generatedRules = append(generatedRules, folderRule)
 			generatedImports = append(generatedImports, folderImports)
 
@@ -562,7 +640,7 @@ func (lang *JS) makeModuleRules(args moduleRuleArgs, jsConfig *JsConfig) ([]*imp
 	// which, if it's local, transitively belongs in the moduleSet
 	recAddTransitiveSet := func(src string) {
 		// for each import that the source file has
-		for imp, _ := range moduleSet[src].set {
+		for imp := range moduleSet[src].set {
 			// if that import is local to this directory
 			if isLocalImport(args.cwd, imp) {
 				// check the remainderSet to see if the src file corresponding to the import
@@ -606,7 +684,7 @@ func (lang *JS) makeModuleRules(args moduleRuleArgs, jsConfig *JsConfig) ([]*imp
 	remainderSrcs := make([]string, 0)
 	remainderImportsList := make([]imports, 0)
 	keys := make([]string, 0)
-	for k, _ := range remainderSet {
+	for k := range remainderSet {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
@@ -757,6 +835,22 @@ func (lang *JS) genAllAssets(args language.GenerateArgs, isJSRoot bool, jsConfig
 		name := "all_assets"
 		r := rule.NewRule(getKind(args.Config, "web_assets"), name)
 		r.SetAttr("srcs", JSRootDeps)
+
+		generatedRules = append(generatedRules, r)
+		generatedImports = append(generatedImports, &noImports)
+	}
+
+	return generatedRules, generatedImports
+}
+
+func (lang *JS) genEmptyPageRule(args language.GenerateArgs, jsConfig *JsConfig, pkgName string, sources []string) ([]*rule.Rule, []interface{}) {
+	generatedRules := make([]*rule.Rule, 0)
+	generatedImports := make([]interface{}, 0)
+
+	if len(sources) == 0 && jsConfig.CollectPages {
+
+		// Add an empty `js_library` rule. This will be given `deps` later in resolve.go
+		r := rule.NewRule(getKind(args.Config, "js_library"), pkgName)
 
 		generatedRules = append(generatedRules, r)
 		generatedImports = append(generatedImports, &noImports)

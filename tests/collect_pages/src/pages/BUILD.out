@@ -1,0 +1,12 @@
+load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
+
+# gazelle:js_nextjs_pages_root
+
+ts_project(
+    name = "pages",
+    srcs = [
+        "404.ts",
+        "index.ts",
+    ],
+    deps = ["//src/pages/my_page"],
+)

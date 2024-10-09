@@ -128,7 +128,7 @@ func (lang *JS) Imports(c *config.Config, r *rule.Rule, f *rule.File) []resolve.
 			dir := filepath.Dir(src)
 			subDirectories[dir] = true
 		}
-		for subDirectory, _ := range subDirectories {
+		for subDirectory := range subDirectories {
 			root := strings.TrimSuffix(base, f.Pkg)
 			relPath := strings.TrimPrefix(subDirectory, root)
 			path := fmt.Sprintf("%s/%s", f.Pkg, relPath)
@@ -280,6 +280,13 @@ func (lang *JS) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Remote
 			packageLocation = ""
 		}
 		dataSet[fmt.Sprintf("//%s:package_json", packageLocation)] = true
+	}
+
+	// Add in page dependencies if they exist
+	if jsConfig.CollectPages && len(jsConfig.CollectedPages) > 0 {
+		for fqName := range jsConfig.CollectedPages {
+			depSet[fqName] = true
+		}
 	}
 
 	deps := []string{}

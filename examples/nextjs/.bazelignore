@@ -1,5 +1,6 @@
 node_modules
 apps/alpha/node_modules
+apps/alpha/pages/__snapshots__
 packages/one/node_modules
 app/.next
 bazel-out
