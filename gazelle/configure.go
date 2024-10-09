@@ -66,11 +66,16 @@ type JsConfig struct {
 	CollectWebAssets   bool
 	CollectAllAssets   bool
 	CollectedAssets    map[string]bool
+	CollectPages       bool
+	CollectedPages     map[string]bool
+	CollectPageFiles   bool
+	CollectedPageFiles map[string]bool
 	CollectAll         bool
 	CollectAllRoot     string
 	CollectAllSources  map[string]bool
 	Fix                bool
 	JSRoot             string
+	NextPagesRoot      string
 	WebAssetSuffixes   map[string]bool
 	Quiet              bool
 	Verbose            bool
@@ -97,21 +102,26 @@ func NewJsConfig() *JsConfig {
 		Visibility: Visibility{
 			Labels: []string{},
 		},
-		CollectBarrels:    false,
-		CollectWebAssets:  false,
-		CollectAllAssets:  false,
-		CollectedAssets:   make(map[string]bool),
-		CollectAll:        false,
-		CollectAllRoot:    "",
-		CollectAllSources: make(map[string]bool),
-		Fix:               false,
-		JSRoot:            "/",
-		WebAssetSuffixes:  make(map[string]bool),
-		Quiet:             false,
-		Verbose:           false,
-		DefaultNpmLabel:   "//:node_modules/",
-		JestTestsPerShard: -1,
-		JestConfig:        "",
+		CollectBarrels:     false,
+		CollectWebAssets:   false,
+		CollectAllAssets:   false,
+		CollectedAssets:    make(map[string]bool),
+		CollectPages:       false,
+		CollectedPages:     make(map[string]bool),
+		CollectPageFiles:   false,
+		CollectedPageFiles: make(map[string]bool),
+		CollectAll:         false,
+		CollectAllRoot:     "",
+		CollectAllSources:  make(map[string]bool),
+		Fix:                false,
+		JSRoot:             "/",
+		NextPagesRoot:      "",
+		WebAssetSuffixes:   make(map[string]bool),
+		Quiet:              false,
+		Verbose:            false,
+		DefaultNpmLabel:    "//:node_modules/",
+		JestTestsPerShard:  -1,
+		JestConfig:         "",
 	}
 }
 
@@ -158,6 +168,18 @@ func (parent *JsConfig) NewChild() *JsConfig {
 	child.CollectWebAssets = parent.CollectWebAssets
 	child.CollectAllAssets = parent.CollectAllAssets
 	child.CollectedAssets = parent.CollectedAssets // Reinitialized on change to JSRoot
+
+	child.NextPagesRoot = parent.NextPagesRoot
+	if parent.CollectPages { // If the parent is collecting pages, the child should collect page files
+		child.CollectPages = false
+		child.CollectPageFiles = true
+		child.CollectedPages = parent.CollectedPages
+		child.CollectedPageFiles = make(map[string]bool)
+	} else {
+		child.CollectPageFiles = parent.CollectPageFiles
+		child.CollectedPages = parent.CollectedPages
+		child.CollectedPageFiles = parent.CollectedPageFiles
+	}
 
 	child.CollectAll = parent.CollectAll
 	child.CollectAllRoot = parent.CollectAllRoot
@@ -223,6 +245,7 @@ func (*JS) KnownDirectives() []string {
 	return []string{
 		"js_extension",
 		"js_root",
+		"js_nextjs_pages_root",
 		"js_lookup_types",
 		"js_fix",
 		"js_package_file",
@@ -286,7 +309,7 @@ func (*JS) Configure(c *config.Config, rel string, f *rule.File) {
 				case "disabled":
 					jsConfig.Enabled = false
 				default:
-					log.Fatalf(Err("failed to read directive %s: %s, only \"enabled\", and \"disabled\" are valid", directive.Key, directive.Value))
+					log.Fatal(Err("failed to read directive %s: %s, only \"enabled\", and \"disabled\" are valid", directive.Key, directive.Value))
 				}
 
 			case "js_lookup_types":
@@ -298,7 +321,7 @@ func (*JS) Configure(c *config.Config, rel string, f *rule.File) {
 			case "js_package_file":
 				values := strings.Split(directive.Value, " ")
 				if len(values) != 2 {
-					log.Fatalf(Err("failed to read directive %s: %s, expected 2 values", directive.Key, directive.Value))
+					log.Fatal(Err("failed to read directive %s: %s, expected 2 values", directive.Key, directive.Value))
 				}
 				jsConfig.PackageFile = values[0]
 				npmLabel := values[1]
@@ -311,7 +334,7 @@ func (*JS) Configure(c *config.Config, rel string, f *rule.File) {
 
 				data, err := os.ReadFile(path.Join(c.RepoRoot, f.Pkg, jsConfig.PackageFile))
 				if err != nil {
-					log.Fatalf(Err("failed to open %s: %v", directive.Value, err))
+					log.Fatal(Err("failed to open %s: %v", directive.Value, err))
 				}
 
 				// Read dependencies from file
@@ -323,14 +346,14 @@ func (*JS) Configure(c *config.Config, rel string, f *rule.File) {
 					DevDependencies: make(map[string]string),
 				}
 				if err := json.Unmarshal(data, &newDeps); err != nil {
-					log.Fatalf(Err("failed to parse %s: %v", directive.Value, err))
+					log.Fatal(Err("failed to parse %s: %v", directive.Value, err))
 				}
 
 				// Store npmLabel in dependencies
-				for k, _ := range newDeps.Dependencies {
+				for k := range newDeps.Dependencies {
 					jsConfig.NpmDependencies.Dependencies[k] = npmLabel
 				}
-				for k, _ := range newDeps.DevDependencies {
+				for k := range newDeps.DevDependencies {
 					jsConfig.NpmDependencies.DevDependencies[k] = npmLabel
 				}
 
@@ -346,7 +369,7 @@ func (*JS) Configure(c *config.Config, rel string, f *rule.File) {
 
 				var err error
 				if jsConfig.ImportAliasPattern, err = regexp.Compile(strings.Join(keyPatterns, "|")); err != nil {
-					log.Fatalf(Err("failed to parse %s: %v", directive.Value, err))
+					log.Fatal(Err("failed to parse %s: %v", directive.Value, err))
 				}
 
 			case "js_visibility":
@@ -360,10 +383,22 @@ func (*JS) Configure(c *config.Config, rel string, f *rule.File) {
 			case "js_root":
 				jSRoot, err := filepath.Rel(".", f.Pkg)
 				if err != nil {
-					log.Fatalf(Err("failed to read directive %s: %v", directive.Key, err))
+					log.Fatal(Err("failed to read directive %s: %v", directive.Key, err))
 				} else {
 					jsConfig.JSRoot = jSRoot
 					jsConfig.CollectedAssets = make(map[string]bool)
+				}
+
+			case "js_nextjs_pages_root":
+				nextPagesRoot, err := filepath.Rel(".", f.Pkg)
+				if err != nil {
+					log.Fatal(Err("failed to read directive %s: %v", directive.Key, err))
+				} else {
+					jsConfig.NextPagesRoot = nextPagesRoot
+					jsConfig.CollectAll = false
+					jsConfig.CollectPages = true
+					jsConfig.CollectedPages = make(map[string]bool)
+					jsConfig.CollectPageFiles = false
 				}
 
 			case "js_collect_barrels":
@@ -387,7 +422,7 @@ func (*JS) Configure(c *config.Config, rel string, f *rule.File) {
 			case "js_collect_all":
 				collectRoot, err := filepath.Rel(".", f.Pkg)
 				if err != nil {
-					log.Fatalf(Err("failed to read directive %s: %v", directive.Key, err))
+					log.Fatal(Err("failed to read directive %s: %v", directive.Key, err))
 				} else {
 					jsConfig.CollectAllRoot = collectRoot
 					jsConfig.CollectAll = true
@@ -410,7 +445,7 @@ func (*JS) Configure(c *config.Config, rel string, f *rule.File) {
 				if len(vals) > 1 {
 					val, err := strconv.ParseBool(directive.Value)
 					if err != nil {
-						log.Fatalf(Err("failed to read directive %s: %v", directive.Key, err))
+						log.Fatal(Err("failed to read directive %s: %v", directive.Key, err))
 					}
 					status = val
 				}
@@ -516,7 +551,7 @@ func readBoolDirective(directive rule.Directive) bool {
 	} else {
 		val, err := strconv.ParseBool(directive.Value)
 		if err != nil {
-			log.Fatalf(Err("failed to read directive %s: %v", directive.Key, err))
+			log.Fatal(Err("failed to read directive %s: %v", directive.Key, err))
 		}
 		return val
 	}
@@ -528,7 +563,7 @@ func readIntDirective(directive rule.Directive) int {
 	} else {
 		val, err := strconv.ParseInt(directive.Value, 10, 32)
 		if err != nil {
-			log.Fatalf(Err("failed to read directive %s: %v", directive.Key, err))
+			log.Fatal(Err("failed to read directive %s: %v", directive.Key, err))
 		}
 		return int(val)
 	}

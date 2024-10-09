@@ -1,0 +1,8 @@
+load("@aspect_rules_js//js:defs.bzl", "js_library")
+
+# gazelle:js_nextjs_pages_root
+
+js_library(
+    name = "pages2",
+    deps = ["//src/pages2/my_page"],
+)

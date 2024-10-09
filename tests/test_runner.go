@@ -32,7 +32,7 @@ func main() {
 
 	// Wrap test with InternalTest so that it can be run by testing.Main
 	theTest := testing.InternalTest{
-		Name: fmt.Sprintf("example_%s", name),
+		Name: fmt.Sprintf("test_%s", name),
 		F:    func(t *testing.T) { RunTest(t, name) },
 	}
 
@@ -90,7 +90,7 @@ func RunTest(t *testing.T, name string) {
 		// Read file contents
 		content, err := os.ReadFile(f.Path)
 		if err != nil {
-			t.Errorf("ioutil.ReadFile(%q) error: %v", f.Path, err)
+			t.Errorf("os.ReadFile(%q) error: %v", f.Path, err)
 		}
 
 		// Add file to inputs or goldens

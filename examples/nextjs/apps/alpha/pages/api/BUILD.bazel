@@ -1,0 +1,9 @@
+load("//bazel:ts_project.bzl", "ts_project")
+
+ts_project(
+    name = "api",
+    srcs = ["hello.ts"],
+    data = ["//:node_modules/next"],
+    visibility = ["//apps/alpha:__subpackages__"],
+    deps = ["//:node_modules/next"],
+)
