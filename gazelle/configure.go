@@ -76,6 +76,7 @@ type JsConfig struct {
 	Fix                bool
 	JSRoot             string
 	NextPagesRoot      string
+	NextPagesRootName  string
 	WebAssetSuffixes   map[string]bool
 	Quiet              bool
 	Verbose            bool
@@ -116,6 +117,7 @@ func NewJsConfig() *JsConfig {
 		Fix:                false,
 		JSRoot:             "/",
 		NextPagesRoot:      "",
+		NextPagesRootName:  "next_pages",
 		WebAssetSuffixes:   make(map[string]bool),
 		Quiet:              false,
 		Verbose:            false,
@@ -170,6 +172,7 @@ func (parent *JsConfig) NewChild() *JsConfig {
 	child.CollectedAssets = parent.CollectedAssets // Reinitialized on change to JSRoot
 
 	child.NextPagesRoot = parent.NextPagesRoot
+	child.NextPagesRootName = parent.NextPagesRootName
 	if parent.CollectPages { // If the parent is collecting pages, the child should collect page files
 		child.CollectPages = false
 		child.CollectPageFiles = true
@@ -246,6 +249,7 @@ func (*JS) KnownDirectives() []string {
 		"js_extension",
 		"js_root",
 		"js_nextjs_pages_root",
+		"js_nextjs_pages_root_name",
 		"js_lookup_types",
 		"js_fix",
 		"js_package_file",
@@ -399,6 +403,13 @@ func (*JS) Configure(c *config.Config, rel string, f *rule.File) {
 					jsConfig.CollectPages = true
 					jsConfig.CollectedPages = make(map[string]bool)
 					jsConfig.CollectPageFiles = false
+				}
+
+			case "js_nextjs_pages_root_name":
+				if directive.Value == "" {
+					jsConfig.NextPagesRootName = "pages"
+				} else {
+					jsConfig.NextPagesRootName = directive.Value
 				}
 
 			case "js_collect_barrels":

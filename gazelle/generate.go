@@ -246,11 +246,9 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 	generatedRules = append(generatedRules, generatedAWARules...)
 	generatedImports = append(generatedImports, generatedAWAImports...)
 
-	generatedTSRules, generatedTSImports := lang.genEmptyPageRule(
+	generatedTSRules, generatedTSImports := lang.genPageRule(
 		args,
 		jsConfig,
-		pkgName,
-		append(sources.tsSources, sources.jsSources...),
 	)
 	generatedRules = append(generatedRules, generatedTSRules...)
 	generatedImports = append(generatedImports, generatedTSImports...)
@@ -542,7 +540,7 @@ func (lang *JS) genRules(args language.GenerateArgs, jsConfig *JsConfig, isBarre
 				imports:  imports,
 			}, jsConfig)
 
-			if jsConfig.CollectPageFiles {
+			if jsConfig.CollectPages || jsConfig.CollectPageFiles {
 				// record this rule as a page
 				fqName := fmt.Sprintf("//%s:%s", path.Join(args.Rel), name)
 				jsConfig.CollectedPages[fqName] = true
@@ -843,15 +841,18 @@ func (lang *JS) genAllAssets(args language.GenerateArgs, isJSRoot bool, jsConfig
 	return generatedRules, generatedImports
 }
 
-func (lang *JS) genEmptyPageRule(args language.GenerateArgs, jsConfig *JsConfig, pkgName string, sources []string) ([]*rule.Rule, []interface{}) {
+func (lang *JS) genPageRule(args language.GenerateArgs, jsConfig *JsConfig) ([]*rule.Rule, []interface{}) {
 	generatedRules := make([]*rule.Rule, 0)
 	generatedImports := make([]interface{}, 0)
 
-	if len(sources) == 0 && jsConfig.CollectPages {
+	if jsConfig.CollectPages {
 
 		// Add an empty `js_library` rule. This will be given `deps` later in resolve.go
-		r := rule.NewRule(getKind(args.Config, "js_library"), pkgName)
+		r := rule.NewRule(getKind(args.Config, "js_library"), jsConfig.NextPagesRootName)
 
+		if len(jsConfig.Visibility.Labels) > 0 {
+			r.SetAttr("visibility", jsConfig.Visibility.Labels)
+		}
 		generatedRules = append(generatedRules, r)
 		generatedImports = append(generatedImports, &noImports)
 	}
