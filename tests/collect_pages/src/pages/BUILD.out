@@ -1,3 +1,4 @@
+load("@aspect_rules_js//js:defs.bzl", "js_library")
 load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
 
 # gazelle:js_nextjs_pages_root
@@ -8,5 +9,12 @@ ts_project(
         "404.ts",
         "index.ts",
     ],
-    deps = ["//src/pages/my_page"],
+)
+
+js_library(
+    name = "next_pages",
+    deps = [
+        ":pages",
+        "//src/pages/my_page",
+    ],
 )
