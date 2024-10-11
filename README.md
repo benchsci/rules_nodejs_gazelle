@@ -193,6 +193,14 @@ The following directives are recognized by this plugin:
   </tr>
 
   <tr>
+    <td><code># gazelle:js_collect_targets</code></td>
+    <td><code>""</code></td>
+  </tr>
+  <tr>
+    <td colspan="2"><p dir="auto">Similar to <code>js_collect_all_assets</code> this directive collects all sibling and child package targets in a target with the given name. See <code>tests/collect_targets</code> for usage.</p></td>
+  </tr>
+
+  <tr>
     <td><code># gazelle:js_web_asset .json,.css,.scss</code></td>
     <td><code>none</code></td>
   </tr>

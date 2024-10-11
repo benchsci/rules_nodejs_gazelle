@@ -113,33 +113,7 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		return language.GenerateResult{}
 	}
 
-	if jsConfig.CollectPages || jsConfig.CollectPageFiles {
-
-		var pagesDepth = len(strings.Split(jsConfig.NextPagesRoot, "/"))
-		var selfDepth = len(strings.Split(args.Rel, "/"))
-
-		if pagesDepth <= selfDepth-2 {
-
-			// if we are at more than one level deeper, then collect all files for the page
-			for _, fileName := range args.RegularFiles {
-
-				path := strings.TrimPrefix(
-					strings.TrimPrefix(
-						path.Join(args.Rel, fileName),
-						jsConfig.NextPagesRoot,
-					),
-					"/",
-				)
-
-				// Still one level deeper, so we need to remove the first part of the path
-				path = strings.Join(strings.Split(path, "/")[1:], "/")
-
-				jsConfig.CollectedPageFiles[path] = true
-			}
-			return language.GenerateResult{}
-		}
-
-	} else if jsConfig.CollectAll && jsConfig.CollectAllRoot != args.Rel {
+	if jsConfig.CollectAll && jsConfig.CollectAllRoot != args.Rel {
 		// collect all files in this directory for use in parent rules
 		for _, fileName := range args.RegularFiles {
 			path := strings.TrimPrefix(
@@ -182,7 +156,7 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 	absJSRoot := path.Join(args.Config.RepoRoot, jsConfig.JSRoot)
 	isJSRoot := absJSRoot == args.Dir
 
-	if len(sources.jsSources) > 0 && (jsConfig.CollectAll || jsConfig.CollectPageFiles) {
+	if len(sources.jsSources) > 0 && jsConfig.CollectAll {
 		// add combined "ts_project" rule with js sources
 		generatedTSRules, generatedTSImports := lang.genRules(
 			args,
@@ -246,7 +220,7 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 	generatedRules = append(generatedRules, generatedAWARules...)
 	generatedImports = append(generatedImports, generatedAWAImports...)
 
-	generatedTSRules, generatedTSImports := lang.genPageRule(
+	generatedTSRules, generatedTSImports := lang.genCollectedTargetsRule(
 		args,
 		jsConfig,
 	)
@@ -349,11 +323,6 @@ func (lang *JS) gatherFiles(args language.GenerateArgs, jsConfig *JsConfig) []st
 	allFiles := args.RegularFiles
 	if jsConfig.CollectAll {
 		for file := range jsConfig.CollectAllSources {
-			allFiles = append(allFiles, file)
-		}
-	}
-	if jsConfig.CollectPageFiles {
-		for file := range jsConfig.CollectedPageFiles {
 			allFiles = append(allFiles, file)
 		}
 	}
@@ -519,7 +488,7 @@ func (lang *JS) genRules(args language.GenerateArgs, jsConfig *JsConfig, isBarre
 		if appendTSExt {
 			name = name + "_ts"
 		}
-		if jsConfig.CollectAll || jsConfig.CollectPages || jsConfig.CollectPageFiles {
+		if jsConfig.CollectAll {
 			// add as a folder
 			for _, existingRule := range lang.readExistingRules(args, false) {
 				// Look for existing rules with the same name, but different kind
@@ -540,11 +509,11 @@ func (lang *JS) genRules(args language.GenerateArgs, jsConfig *JsConfig, isBarre
 				imports:  imports,
 			}, jsConfig)
 
-			if jsConfig.CollectPages || jsConfig.CollectPageFiles {
-				// record this rule as a page
+			if jsConfig.CollectedTargets != nil {
 				fqName := fmt.Sprintf("//%s:%s", path.Join(args.Rel), name)
-				jsConfig.CollectedPages[fqName] = true
+				jsConfig.CollectedTargets[fqName] = true
 			}
+
 			generatedRules = append(generatedRules, folderRule)
 			generatedImports = append(generatedImports, folderImports)
 
@@ -561,6 +530,12 @@ func (lang *JS) genRules(args language.GenerateArgs, jsConfig *JsConfig, isBarre
 				log.Print(Warn("[WARN] disjoint barrel %s", args.Rel))
 			}
 			for i := range moduleRules {
+
+				if jsConfig.CollectedTargets != nil {
+					fqName := fmt.Sprintf("//%s:%s", path.Join(args.Rel), moduleRules[i].Name())
+					jsConfig.CollectedTargets[fqName] = true
+				}
+
 				generatedRules = append(generatedRules, moduleRules[i])
 				generatedImports = append(generatedImports, moduleImports[i])
 			}
@@ -572,6 +547,12 @@ func (lang *JS) genRules(args language.GenerateArgs, jsConfig *JsConfig, isBarre
 				trimExt:  true,
 			}, jsConfig)
 			for i := range singletonRules {
+
+				if jsConfig.CollectedTargets != nil {
+					fqName := fmt.Sprintf("//%s:%s", path.Join(args.Rel), singletonRules[i].Name())
+					jsConfig.CollectedTargets[fqName] = true
+				}
+
 				generatedRules = append(generatedRules, singletonRules[i])
 				generatedImports = append(generatedImports, &imports[i])
 			}
@@ -841,14 +822,14 @@ func (lang *JS) genAllAssets(args language.GenerateArgs, isJSRoot bool, jsConfig
 	return generatedRules, generatedImports
 }
 
-func (lang *JS) genPageRule(args language.GenerateArgs, jsConfig *JsConfig) ([]*rule.Rule, []interface{}) {
+func (lang *JS) genCollectedTargetsRule(args language.GenerateArgs, jsConfig *JsConfig) ([]*rule.Rule, []interface{}) {
 	generatedRules := make([]*rule.Rule, 0)
 	generatedImports := make([]interface{}, 0)
 
-	if jsConfig.CollectPages {
+	if jsConfig.CollectTargets != "" {
 
 		// Add an empty `js_library` rule. This will be given `deps` later in resolve.go
-		r := rule.NewRule(getKind(args.Config, "js_library"), jsConfig.NextPagesRootName)
+		r := rule.NewRule(getKind(args.Config, "js_library"), jsConfig.CollectTargets)
 
 		if len(jsConfig.Visibility.Labels) > 0 {
 			r.SetAttr("visibility", jsConfig.Visibility.Labels)

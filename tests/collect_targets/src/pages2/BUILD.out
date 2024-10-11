@@ -1,7 +1,7 @@
 load("@aspect_rules_js//js:defs.bzl", "js_library")
 
-# gazelle:js_nextjs_pages_root
-# gazelle:js_nextjs_pages_root_name next_pages2
+# gazelle:js_collect_all
+# gazelle:js_collect_targets next_pages2
 
 js_library(
     name = "next_pages2",
