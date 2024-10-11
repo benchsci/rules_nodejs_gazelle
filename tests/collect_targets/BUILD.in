@@ -1,7 +1,8 @@
 load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
 
 # gazelle:js_root
-# gazelle:js_verbose
+# gazelle:js_jest_config :jest.config
+# gazelle:js_quiet
 
 ts_project(
     name = "index",
