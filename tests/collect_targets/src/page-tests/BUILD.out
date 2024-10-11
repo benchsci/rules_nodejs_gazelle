@@ -1,0 +1,14 @@
+load("@rules_jest//jest:defs.bzl", "jest_test")
+
+# gazelle:js_collect_all
+
+jest_test(
+    name = "page-tests_test",
+    srcs = ["test.test.ts"],
+    config = "//:jest.config",
+    data = [
+        "//:package_json",
+        "//src/pages/my_page",
+    ],
+    deps = ["//src/pages/my_page"],
+)
