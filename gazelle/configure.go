@@ -66,17 +66,13 @@ type JsConfig struct {
 	CollectWebAssets   bool
 	CollectAllAssets   bool
 	CollectedAssets    map[string]bool
-	CollectPages       bool
-	CollectedPages     map[string]bool
-	CollectPageFiles   bool
-	CollectedPageFiles map[string]bool
+	CollectTargets     string
+	CollectedTargets   map[string]bool
 	CollectAll         bool
 	CollectAllRoot     string
 	CollectAllSources  map[string]bool
 	Fix                bool
 	JSRoot             string
-	NextPagesRoot      string
-	NextPagesRootName  string
 	WebAssetSuffixes   map[string]bool
 	Quiet              bool
 	Verbose            bool
@@ -103,27 +99,23 @@ func NewJsConfig() *JsConfig {
 		Visibility: Visibility{
 			Labels: []string{},
 		},
-		CollectBarrels:     false,
-		CollectWebAssets:   false,
-		CollectAllAssets:   false,
-		CollectedAssets:    make(map[string]bool),
-		CollectPages:       false,
-		CollectedPages:     make(map[string]bool),
-		CollectPageFiles:   false,
-		CollectedPageFiles: make(map[string]bool),
-		CollectAll:         false,
-		CollectAllRoot:     "",
-		CollectAllSources:  make(map[string]bool),
-		Fix:                false,
-		JSRoot:             "/",
-		NextPagesRoot:      "",
-		NextPagesRootName:  "next_pages",
-		WebAssetSuffixes:   make(map[string]bool),
-		Quiet:              false,
-		Verbose:            false,
-		DefaultNpmLabel:    "//:node_modules/",
-		JestTestsPerShard:  -1,
-		JestConfig:         "",
+		CollectBarrels:    false,
+		CollectWebAssets:  false,
+		CollectAllAssets:  false,
+		CollectedAssets:   make(map[string]bool),
+		CollectTargets:    "",
+		CollectedTargets:  make(map[string]bool),
+		CollectAll:        false,
+		CollectAllRoot:    "",
+		CollectAllSources: make(map[string]bool),
+		Fix:               false,
+		JSRoot:            "/",
+		WebAssetSuffixes:  make(map[string]bool),
+		Quiet:             false,
+		Verbose:           false,
+		DefaultNpmLabel:   "//:node_modules/",
+		JestTestsPerShard: -1,
+		JestConfig:        "",
 	}
 }
 
@@ -171,18 +163,8 @@ func (parent *JsConfig) NewChild() *JsConfig {
 	child.CollectAllAssets = parent.CollectAllAssets
 	child.CollectedAssets = parent.CollectedAssets // Reinitialized on change to JSRoot
 
-	child.NextPagesRoot = parent.NextPagesRoot
-	child.NextPagesRootName = parent.NextPagesRootName
-	if parent.CollectPages { // If the parent is collecting pages, the child should collect page files
-		child.CollectPages = false
-		child.CollectPageFiles = true
-		child.CollectedPages = parent.CollectedPages
-		child.CollectedPageFiles = make(map[string]bool)
-	} else {
-		child.CollectPageFiles = parent.CollectPageFiles
-		child.CollectedPages = parent.CollectedPages
-		child.CollectedPageFiles = parent.CollectedPageFiles
-	}
+	child.CollectTargets = ""
+	child.CollectedTargets = parent.CollectedTargets
 
 	child.CollectAll = parent.CollectAll
 	child.CollectAllRoot = parent.CollectAllRoot
@@ -248,8 +230,6 @@ func (*JS) KnownDirectives() []string {
 	return []string{
 		"js_extension",
 		"js_root",
-		"js_nextjs_pages_root",
-		"js_nextjs_pages_root_name",
 		"js_lookup_types",
 		"js_fix",
 		"js_package_file",
@@ -262,6 +242,7 @@ func (*JS) KnownDirectives() []string {
 		"js_collect_all_assets",
 		"js_aggregate_all_assets",
 		"js_collect_all",
+		"js_collect_targets",
 		"js_jest_test_per_shard",
 		"js_jest_size",
 		"js_jest_config",
@@ -393,23 +374,13 @@ func (*JS) Configure(c *config.Config, rel string, f *rule.File) {
 					jsConfig.CollectedAssets = make(map[string]bool)
 				}
 
-			case "js_nextjs_pages_root":
-				nextPagesRoot, err := filepath.Rel(".", f.Pkg)
-				if err != nil {
-					log.Fatal(Err("failed to read directive %s: %v", directive.Key, err))
-				} else {
-					jsConfig.NextPagesRoot = nextPagesRoot
-					jsConfig.CollectAll = false
-					jsConfig.CollectPages = true
-					jsConfig.CollectedPages = make(map[string]bool)
-					jsConfig.CollectPageFiles = false
-				}
-
-			case "js_nextjs_pages_root_name":
+			case "js_collect_targets":
 				if directive.Value == "" {
-					jsConfig.NextPagesRootName = "pages"
+					jsConfig.CollectTargets = ""
+					jsConfig.CollectedTargets = nil
 				} else {
-					jsConfig.NextPagesRootName = directive.Value
+					jsConfig.CollectTargets = directive.Value
+					jsConfig.CollectedTargets = make(map[string]bool)
 				}
 
 			case "js_collect_barrels":

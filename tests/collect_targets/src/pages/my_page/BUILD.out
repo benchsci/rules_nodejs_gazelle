@@ -1,10 +1,11 @@
 load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
 
+# gazelle:js_collect_all
+
 ts_project(
     name = "my_page",
     srcs = [
         "index.ts",
         "module_file.ts",
-        "subpage/index.ts",
     ],
 )

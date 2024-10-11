@@ -1,35 +1,9 @@
+load("@aspect_rules_js//js:defs.bzl", "js_library")
 load("//bazel:jest_test.bzl", "jest_test")
 load("//bazel:ts_project.bzl", "ts_project")
 
-# gazelle:js_nextjs_pages_root
-
-jest_test(
-    name = "index.test",
-    srcs = ["index.test.tsx"],
-    config = "//apps/alpha:jest.config",
-    data = [
-        ":pages",
-        "//:node_modules/@testing-library/jest-dom",
-        "//:node_modules/@testing-library/react",
-        "//:node_modules/@types/jest",
-        "//:node_modules/jest-environment-jsdom",
-        "//:node_modules/jest-transform-stub",
-        "//:node_modules/react",
-        "//apps/alpha:package_json",
-    ],
-    snapshots = ["__snapshots__/index.test.tsx.snap"],
-    visibility = ["//apps/alpha:__subpackages__"],
-    deps = [
-        ":pages",
-        "//:node_modules/@testing-library/jest-dom",
-        "//:node_modules/@testing-library/react",
-        "//:node_modules/@types/jest",
-        "//:node_modules/jest-environment-jsdom",
-        "//:node_modules/jest-transform-stub",
-        "//:node_modules/react",
-        "//apps/alpha/pages/api",
-    ],
-)
+# gazelle:js_collect_all
+# gazelle:js_collect_targets next_pages
 
 ts_project(
     name = "pages",
@@ -52,6 +26,41 @@ ts_project(
         "//:node_modules/react",
         "//apps/alpha:node_modules/@types/is-even",
         "//apps/alpha:node_modules/is-even",
+    ],
+)
+
+jest_test(
+    name = "pages_test",
+    srcs = ["index.test.tsx"],
+    config = "//apps/alpha:jest.config",
+    data = [
+        ":pages",
+        "//:node_modules/@testing-library/jest-dom",
+        "//:node_modules/@testing-library/react",
+        "//:node_modules/@types/jest",
+        "//:node_modules/jest-environment-jsdom",
+        "//:node_modules/jest-transform-stub",
+        "//:node_modules/react",
+        "//apps/alpha:package_json",
+    ],
+    snapshots = ["__snapshots__"],
+    visibility = ["//apps/alpha:__subpackages__"],
+    deps = [
+        ":pages",
+        "//:node_modules/@testing-library/jest-dom",
+        "//:node_modules/@testing-library/react",
+        "//:node_modules/@types/jest",
+        "//:node_modules/jest-environment-jsdom",
+        "//:node_modules/jest-transform-stub",
+        "//:node_modules/react",
+    ],
+)
+
+js_library(
+    name = "next_pages",
+    visibility = ["//apps/alpha:__subpackages__"],
+    deps = [
+        ":pages",
         "//apps/alpha/pages/api",
     ],
 )

@@ -49,7 +49,7 @@ go_binary(
         "collect_all_test_shards",
         "collect_asset_modules",
         "collect_asset_singletons",
-        "collect_pages",
+        "collect_targets",
         "default_npm_label",
         "disabled",
         "disjoint_module",

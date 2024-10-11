@@ -120,7 +120,7 @@ func (lang *JS) Imports(c *config.Config, r *rule.Rule, f *rule.File) []resolve.
 	}
 
 	// Any subfolders could be used to depend on this rule
-	folderImports := (jsConfig.CollectAll || jsConfig.CollectPageFiles) && (r.Kind() == getKind(c, "ts_project") || r.Kind() == getKind(c, "js_library"))
+	folderImports := jsConfig.CollectAll && (r.Kind() == getKind(c, "ts_project") || r.Kind() == getKind(c, "js_library"))
 	if folderImports {
 		base := filepath.Dir(f.Path)
 		subDirectories := make(map[string]bool)
@@ -283,8 +283,8 @@ func (lang *JS) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Remote
 	}
 
 	// Add in page dependencies if they exist
-	if jsConfig.CollectPages && len(jsConfig.CollectedPages) > 0 && r.Name() == jsConfig.NextPagesRootName {
-		for fqName := range jsConfig.CollectedPages {
+	if r.Name() == jsConfig.CollectTargets {
+		for fqName := range jsConfig.CollectedTargets {
 			lbl, err := label.Parse(fqName)
 			if err != nil {
 				log.Fatal(Err("failed to parse CollectedPages label: %v", err))

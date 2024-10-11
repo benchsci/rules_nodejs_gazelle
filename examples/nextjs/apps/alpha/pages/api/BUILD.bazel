@@ -1,5 +1,7 @@
 load("//bazel:ts_project.bzl", "ts_project")
 
+# gazelle:js_collect_all
+
 ts_project(
     name = "api",
     srcs = ["hello.ts"],
