@@ -112,7 +112,7 @@ func (lang *JS) Imports(c *config.Config, r *rule.Rule, f *rule.File) []resolve.
 	}
 
 	// modules can be resolved via the directory containing them
-	if isBarrel {
+	if isBarrel || jsConfig.CollectAll {
 		importSpecs = append(importSpecs, resolve.ImportSpec{
 			Lang: lang.Name(),
 			Imp:  f.Pkg,
