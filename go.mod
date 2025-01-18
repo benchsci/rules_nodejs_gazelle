@@ -1,4 +1,4 @@
-module github.com/bazelbuild/rules_python
+module github.com/benchsci/rules_nodejs_gazelle
 
 go 1.21
 
