@@ -112,7 +112,7 @@ func (lang *JS) Imports(c *config.Config, r *rule.Rule, f *rule.File) []resolve.
 	}
 
 	// modules can be resolved via the directory containing them
-	if isBarrel || jsConfig.CollectAll {
+	if (isBarrel || jsConfig.CollectAll) && r.Kind() != getKind(c, "jest_test") {
 		importSpecs = append(importSpecs, resolve.ImportSpec{
 			Lang: lang.Name(),
 			Imp:  f.Pkg,
