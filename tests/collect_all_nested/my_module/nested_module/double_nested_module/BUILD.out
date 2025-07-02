@@ -10,9 +10,14 @@ jest_test(
     srcs = [
         "a.test.ts",
         "b.test.ts",
+        "index.test.ts",
     ],
     config = "//:jest.config",
-    data = ["//:package_json"],
+    data = [
+        ":double_nested_module",
+        "//:package_json",
+    ],
+    deps = [":double_nested_module"],
 )
 
 ts_project(
