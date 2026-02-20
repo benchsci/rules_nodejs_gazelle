@@ -349,7 +349,7 @@ func (lang *JS) resolveWalkParents(name string, depSet map[string]bool, dataSet 
 			// try to find a rule providing the filePath
 			resolveResult := lang.tryResolve(filePath, c, ix, from)
 			if resolveResult.err != nil {
-				log.Print(Err("%v", resolveResult.err))
+				//log.Print(Err("%v", resolveResult.err))
 				return
 			}
 			if resolveResult.selfImport {

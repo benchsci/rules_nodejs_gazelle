@@ -25,31 +25,92 @@ import (
 	"strings"
 )
 
-var quotePattern = regexp.MustCompile(`([/][/].*)|(?:[/][*](?:\n|.)*?[*][/])`)
+// removeComments removes JavaScript comments from the code
+// while being more efficient than the previous regex approach.
+// Note: This does NOT remove strings, as import paths are inside strings.
+func removeComments(data []byte) []byte {
+	var result strings.Builder
+	result.Grow(len(data))
+
+	i := 0
+	inString := false
+	stringQuote := byte(0)
+
+	for i < len(data) {
+		// Handle string literals (we need to preserve them for imports)
+		if !inString && (data[i] == '"' || data[i] == '\'' || data[i] == '`') {
+			inString = true
+			stringQuote = data[i]
+			result.WriteByte(data[i])
+			i++
+			continue
+		}
+
+		if inString {
+			// Handle escaped characters in strings
+			if data[i] == '\\' && i+1 < len(data) {
+				result.WriteByte(data[i])
+				i++
+				result.WriteByte(data[i])
+				i++
+				continue
+			}
+			// Check for closing quote
+			if data[i] == stringQuote {
+				inString = false
+				stringQuote = 0
+			}
+			result.WriteByte(data[i])
+			i++
+			continue
+		}
+
+		// Only remove comments when not inside a string
+		// Check for single-line comment
+		if i+1 < len(data) && data[i] == '/' && data[i+1] == '/' {
+			// Skip to end of line
+			for i < len(data) && data[i] != '\n' {
+				i++
+			}
+			if i < len(data) {
+				result.WriteByte('\n')
+				i++
+			}
+			continue
+		}
+
+		// Check for multi-line comment
+		if i+1 < len(data) && data[i] == '/' && data[i+1] == '*' {
+			i += 2
+			// Skip until we find */
+			for i+1 < len(data) {
+				if data[i] == '*' && data[i+1] == '/' {
+					i += 2
+					break
+				}
+				i++
+			}
+			result.WriteByte(' ')
+			continue
+		}
+
+		result.WriteByte(data[i])
+		i++
+	}
+
+	return []byte(result.String())
+}
 
 func ParseJS(data []byte) ([]string, int, error) {
+	// Remove comments in a single efficient pass
+	cleanedData := removeComments(data)
 
-	lastCommentMatchIndex := 0
-	codeBlocks := make([][]int, 0)
-	for _, match := range quotePattern.FindAllIndex(data, -1) {
-		codeBlocks = append(codeBlocks, []int{lastCommentMatchIndex, match[0]})
-		lastCommentMatchIndex = match[1]
+	imports, jestTestCount, err := parseCodeBlock(cleanedData)
+	if err != nil {
+		return nil, 0, err
 	}
-	codeBlocks = append(codeBlocks, []int{lastCommentMatchIndex, len(data)})
 
-	imports := make([]string, 0)
-	jestTestCount := 0
-
-	for _, block := range codeBlocks {
-		blockImports, blockTestCount, err := parseCodeBlock(data[block[0]:block[1]])
-		if err != nil {
-			return nil, 0, err
-		}
-		imports = append(imports, blockImports...)
-		jestTestCount += blockTestCount
-	}
 	sort.Strings(imports)
-
 	return imports, jestTestCount, nil
 }
 
@@ -76,52 +137,66 @@ func compileJsImportPattern() *regexp.Regexp {
 var jestTestPattern = regexp.MustCompile(`(?m)^\s*it\(`)
 
 func parseCodeBlock(data []byte) ([]string, int, error) {
+	dataStr := string(data)
+
+	// Short-circuit: only run expensive regex if we find relevant keywords
+	hasImportKeywords := strings.Contains(dataStr, "import") ||
+		strings.Contains(dataStr, "require") ||
+		strings.Contains(dataStr, "export") ||
+		strings.Contains(dataStr, "jest")
 
 	imports := make([]string, 0)
-	for _, match := range jsImportPattern.FindAllSubmatch(data, -1) {
-		switch {
-		case match[IMPORT] != nil:
-			unquoted, err := unquoteImportString(match[IMPORT])
-			if err != nil {
-				return nil, 0, fmt.Errorf("unquoting string literal %s from js, %v", match[IMPORT], err)
-			}
-			imports = append(imports, unquoted)
 
-		case match[REQUIRE] != nil:
-			unquoted, err := unquoteImportString(match[REQUIRE])
-			if err != nil {
-				return nil, 0, fmt.Errorf("unquoting string literal %s from js, %v", match[REQUIRE], err)
-			}
-			imports = append(imports, unquoted)
+	if hasImportKeywords {
+		for _, match := range jsImportPattern.FindAllSubmatch(data, -1) {
+			switch {
+			case match[IMPORT] != nil:
+				unquoted, err := unquoteImportString(match[IMPORT])
+				if err != nil {
+					return nil, 0, fmt.Errorf("unquoting string literal %s from js, %v", match[IMPORT], err)
+				}
+				imports = append(imports, unquoted)
 
-		case match[EXPORT] != nil:
-			unquoted, err := unquoteImportString(match[EXPORT])
-			if err != nil {
-				return nil, 0, fmt.Errorf("unquoting string literal %s from js, %v", match[EXPORT], err)
-			}
-			imports = append(imports, unquoted)
+			case match[REQUIRE] != nil:
+				unquoted, err := unquoteImportString(match[REQUIRE])
+				if err != nil {
+					return nil, 0, fmt.Errorf("unquoting string literal %s from js, %v", match[REQUIRE], err)
+				}
+				imports = append(imports, unquoted)
 
-		case match[JEST_MOCK] != nil:
-			unquoted, err := unquoteImportString(match[JEST_MOCK])
-			if err != nil {
-				return nil, 0, fmt.Errorf("unquoting string literal %s from js, %v", match[JEST_MOCK], err)
-			}
-			imports = append(imports, unquoted)
+			case match[EXPORT] != nil:
+				unquoted, err := unquoteImportString(match[EXPORT])
+				if err != nil {
+					return nil, 0, fmt.Errorf("unquoting string literal %s from js, %v", match[EXPORT], err)
+				}
+				imports = append(imports, unquoted)
 
-		case match[DYNAMIC_IMPORT] != nil:
-			unquoted, err := unquoteImportString(match[DYNAMIC_IMPORT])
-			if err != nil {
-				return nil, 0, fmt.Errorf("unquoting string literal %s from js, %v", match[DYNAMIC_IMPORT], err)
-			}
-			imports = append(imports, unquoted)
+			case match[JEST_MOCK] != nil:
+				unquoted, err := unquoteImportString(match[JEST_MOCK])
+				if err != nil {
+					return nil, 0, fmt.Errorf("unquoting string literal %s from js, %v", match[JEST_MOCK], err)
+				}
+				imports = append(imports, unquoted)
 
-		default:
-			// Comment matched. Nothing to extract.
+			case match[DYNAMIC_IMPORT] != nil:
+				unquoted, err := unquoteImportString(match[DYNAMIC_IMPORT])
+				if err != nil {
+					return nil, 0, fmt.Errorf("unquoting string literal %s from js, %v", match[DYNAMIC_IMPORT], err)
+				}
+				imports = append(imports, unquoted)
+
+			default:
+				// Comment matched. Nothing to extract.
+			}
 		}
 	}
 	sort.Strings(imports)
 
-	jestTestCount := len(jestTestPattern.FindAll(data, -1))
+	// Short-circuit: only run test pattern if we find "it(" keyword
+	jestTestCount := 0
+	if strings.Contains(dataStr, "it(") {
+		jestTestCount = len(jestTestPattern.FindAll(data, -1))
+	}
 
 	return imports, jestTestCount, nil
 }
