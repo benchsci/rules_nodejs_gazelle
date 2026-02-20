@@ -29,9 +29,6 @@ jobs:
                   key: bazel-cache-${{ hashFiles('**/BUILD.bazel', '**/*.bzl', 'WORKSPACE', '**/*.js') }}
                   restore-keys: bazel-cache-
             - name: bazel test //...
-              env:
-                  # Bazelisk will download bazel to here
-                  XDG_CACHE_HOME: ~/.cache/bazel-repo
               run: bazel test //...
     test_bzlmod:
         # The type of runner that the job will run on
@@ -50,7 +47,4 @@ jobs:
                   key: bazel-cache-${{ hashFiles('**/BUILD.bazel', '**/*.bzl', 'WORKSPACE', '**/*.js') }}
                   restore-keys: bazel-cache-
             - name: bazel test //... --enable_bzlmod
-              env:
-                  # Bazelisk will download bazel to here
-                  XDG_CACHE_HOME: ~/.cache/bazel-repo
               run: bazel test //... --enable_bzlmod
