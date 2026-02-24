@@ -23,9 +23,6 @@ jobs:
                   key: bazel-cache-${{ hashFiles('**/BUILD.bazel', '**/*.bzl', 'WORKSPACE', '**/*.js') }}
                   restore-keys: bazel-cache-
             - name: bazel test //...
-              env:
-                  # Bazel will download bazel to here
-                  XDG_CACHE_HOME: ~/.cache/bazel-repo
               run: bazel test //...
             - name: Prepare Release
               run: .github/workflows/workspace_snippet.sh ${{ env.GITHUB_REF_NAME }} > release_notes.txt
