@@ -148,6 +148,35 @@ if (process.ENV.SHOULD_IMPORT) {
 			const foo = import('dynamic_module2.js')`,
 			want: []string{"dynamic_module.js", "dynamic_module2.js"},
 		},
+		{
+			desc: "declare module augmentation",
+			name: "augmentation.tsx",
+			js: `import { GridPaginationModel } from '@mui/x-data-grid-pro'
+
+declare module '@mui/x-data-grid-pro' {
+  interface FooterPropsOverrides {
+    page: number
+  }
+}`,
+			want: []string{"@mui/x-data-grid-pro", "@mui/x-data-grid-pro"},
+		},
+		{
+			desc: "declare module single quote",
+			name: "augmentation2.ts",
+			js:   `declare module 'some-package' {}`,
+			want: []string{"some-package"},
+		},
+		{
+			desc: "declare module with import",
+			name: "augmentation3.d.ts",
+			js: `import { Theme } from '@mui/material/styles'
+declare module '@mui/material/styles' {
+  interface Palette {
+    custom: string
+  }
+}`,
+			want: []string{"@mui/material/styles", "@mui/material/styles"},
+		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 

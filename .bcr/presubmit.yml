@@ -10,3 +10,12 @@ bcr_test_module:
             platform: ${{ platform }}
             run_targets:
               - '//:gazelle'
+incompatible_flags:
+    "--incompatible_config_setting_private_default_visibility":
+        - 8.x
+    "--incompatible_disable_starlark_host_transitions":
+        - 8.x
+    "--incompatible_autoload_externally=":
+        - 8.x
+    "--incompatible_strict_action_env":
+        - 8.x

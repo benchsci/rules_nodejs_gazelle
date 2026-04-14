@@ -120,6 +120,7 @@ const (
 	EXPORT         = 3
 	JEST_MOCK      = 4
 	DYNAMIC_IMPORT = 5
+	DECLARE_MODULE = 6
 )
 
 var jsImportPattern = compileJsImportPattern()
@@ -131,7 +132,8 @@ func compileJsImportPattern() *regexp.Regexp {
 	exportPattern := `^export\s(?:(?:.|\n)+?from )??(?P<export>` + stringLiteralPattern + `)`
 	jestMockPattern := `^\s*?(?:const .+ = )?jest.mock\((?P<jestMock>` + stringLiteralPattern + `),`
 	dynamicImportPattern := `^.*?import\((?P<dynamicImport>` + stringLiteralPattern + `)\)`
-	return regexp.MustCompile(`(?m)` + strings.Join([]string{importPattern, requirePattern, exportPattern, jestMockPattern, dynamicImportPattern}, "|"))
+	declareModulePattern := `^declare\s+module\s+(?P<declareModule>` + stringLiteralPattern + `)`
+	return regexp.MustCompile(`(?m)` + strings.Join([]string{importPattern, requirePattern, exportPattern, jestMockPattern, dynamicImportPattern, declareModulePattern}, "|"))
 }
 
 var jestTestPattern = regexp.MustCompile(`(?m)^\s*it\(`)
@@ -143,7 +145,8 @@ func parseCodeBlock(data []byte) ([]string, int, error) {
 	hasImportKeywords := strings.Contains(dataStr, "import") ||
 		strings.Contains(dataStr, "require") ||
 		strings.Contains(dataStr, "export") ||
-		strings.Contains(dataStr, "jest")
+		strings.Contains(dataStr, "jest") ||
+		strings.Contains(dataStr, "declare")
 
 	imports := make([]string, 0)
 
@@ -182,6 +185,13 @@ func parseCodeBlock(data []byte) ([]string, int, error) {
 				unquoted, err := unquoteImportString(match[DYNAMIC_IMPORT])
 				if err != nil {
 					return nil, 0, fmt.Errorf("unquoting string literal %s from js, %v", match[DYNAMIC_IMPORT], err)
+				}
+				imports = append(imports, unquoted)
+
+			case match[DECLARE_MODULE] != nil:
+				unquoted, err := unquoteImportString(match[DECLARE_MODULE])
+				if err != nil {
+					return nil, 0, fmt.Errorf("unquoting string literal %s from js, %v", match[DECLARE_MODULE], err)
 				}
 				imports = append(imports, unquoted)
 
