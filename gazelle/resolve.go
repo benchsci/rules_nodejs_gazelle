@@ -377,6 +377,37 @@ func (lang *JS) resolveWalkParents(name string, depSet map[string]bool, dataSet 
 
 		}
 
+		// Try directory/index resolution (Node.js convention: require('dir') -> dir/index.{ts,tsx,js})
+		indexTarget := path.Join(target, "index")
+		for _, ext := range append(append([]string{""}, tsExtensions...), jsExtensions...) {
+			filePath := indexTarget + ext
+			tries = append(tries, filePath)
+
+			resolveResult := lang.tryResolve(filePath, c, ix, from)
+			if resolveResult.err != nil {
+				return
+			}
+			if resolveResult.selfImport {
+				return
+			}
+			if resolveResult.label != label.NoLabel {
+				lbl := resolveResult.label
+				dep := lbl.Rel(from.Repo, from.Pkg).String()
+				if !lang.isWebAsset(jsConfig, filePath) {
+					depSet[dep] = true
+				} else {
+					dataSet[dep] = true
+				}
+				return
+			}
+			if resolveResult.fileName != "" {
+				pkgName := path.Dir(indexTarget)
+				data := fmt.Sprintf("//%s:%s", pkgName, resolveResult.fileName)
+				dataSet[data] = true
+				return
+			}
+		}
+
 		if jsConfig.JSRoot == localDir || localDir == "." {
 			// unable to resolve import
 			if !jsConfig.Quiet {

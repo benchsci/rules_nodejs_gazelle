@@ -1,50 +1,75 @@
 name: CI
 
-# Controls when the action will run.
 on:
-    # Triggers the workflow on push or pull request events but only for the main branch
     push:
         branches: [main]
     pull_request:
         branches: [main]
-
-    # Allows you to run this workflow manually from the Actions tab
     workflow_dispatch:
 
 jobs:
     test:
-        # The type of runner that the job will run on
-        runs-on: ubuntu-latest
-
-        # Steps represent a sequence of tasks that will be executed as part of the job
+        runs-on: ${{ matrix.os }}
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [ubuntu-latest, macos-latest]
+                bazel_version: ['6.5.0', '7.6.1']
         steps:
             - name: Checkout
               uses: actions/checkout@v4
-            - name: Mount bazel caches
+            - name: Mount bazel caches (Linux)
+              if: startsWith(matrix.os, 'ubuntu')
               uses: actions/cache@v3
               with:
                   path: |
-                      "~/.cache/bazel"
-                      "~/.cache/bazel-repo"
-                  key: bazel-cache-${{ hashFiles('**/BUILD.bazel', '**/*.bzl', 'WORKSPACE', '**/*.js') }}
-                  restore-keys: bazel-cache-
+                      ~/.cache/bazel
+                      ~/.cache/bazel-repo
+                  key: bazel-cache-${{ matrix.os }}-${{ matrix.bazel_version }}-${{ hashFiles('**/BUILD.bazel', '**/*.bzl', 'WORKSPACE', '**/*.js') }}
+                  restore-keys: bazel-cache-${{ matrix.os }}-${{ matrix.bazel_version }}-
+            - name: Mount bazel caches (macOS)
+              if: startsWith(matrix.os, 'macos')
+              uses: actions/cache@v3
+              with:
+                  path: |
+                      ~/Library/Caches/bazel
+                      ~/Library/Caches/bazel-repo
+                  key: bazel-cache-${{ matrix.os }}-${{ matrix.bazel_version }}-${{ hashFiles('**/BUILD.bazel', '**/*.bzl', 'WORKSPACE', '**/*.js') }}
+                  restore-keys: bazel-cache-${{ matrix.os }}-${{ matrix.bazel_version }}-
             - name: bazel test //...
+              env:
+                  USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
               run: bazel test //...
-    test_bzlmod:
-        # The type of runner that the job will run on
-        runs-on: ubuntu-latest
 
-        # Steps represent a sequence of tasks that will be executed as part of the job
+    test_bzlmod:
+        runs-on: ${{ matrix.os }}
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [ubuntu-latest, macos-latest]
+                bazel_version: ['7.6.1']
         steps:
             - name: Checkout
               uses: actions/checkout@v4
-            - name: Mount bazel caches
+            - name: Mount bazel caches (Linux)
+              if: startsWith(matrix.os, 'ubuntu')
               uses: actions/cache@v3
               with:
                   path: |
-                      "~/.cache/bazel"
-                      "~/.cache/bazel-repo"
-                  key: bazel-cache-${{ hashFiles('**/BUILD.bazel', '**/*.bzl', 'WORKSPACE', '**/*.js') }}
-                  restore-keys: bazel-cache-
+                      ~/.cache/bazel
+                      ~/.cache/bazel-repo
+                  key: bazel-cache-bzlmod-${{ matrix.os }}-${{ matrix.bazel_version }}-${{ hashFiles('**/BUILD.bazel', '**/*.bzl', 'WORKSPACE', '**/*.js') }}
+                  restore-keys: bazel-cache-bzlmod-${{ matrix.os }}-${{ matrix.bazel_version }}-
+            - name: Mount bazel caches (macOS)
+              if: startsWith(matrix.os, 'macos')
+              uses: actions/cache@v3
+              with:
+                  path: |
+                      ~/Library/Caches/bazel
+                      ~/Library/Caches/bazel-repo
+                  key: bazel-cache-bzlmod-${{ matrix.os }}-${{ matrix.bazel_version }}-${{ hashFiles('**/BUILD.bazel', '**/*.bzl', 'WORKSPACE', '**/*.js') }}
+                  restore-keys: bazel-cache-bzlmod-${{ matrix.os }}-${{ matrix.bazel_version }}-
             - name: bazel test //... --enable_bzlmod
+              env:
+                  USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
               run: bazel test //... --enable_bzlmod
