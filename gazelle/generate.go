@@ -84,11 +84,13 @@ func (lang *JS) Loads() []rule.LoadInfo {
 	}
 }
 
-func getKind(c *config.Config, kindName string) string {
-	// Extract kind_name from KindMap
-	if kind, ok := c.KindMap[kindName]; ok {
-		return kind.KindName
-
+// unmapKind returns the builtin kind for a rule kind that may have been
+// renamed on disk via a "# gazelle:map_kind" directive.
+func unmapKind(c *config.Config, kindName string) string {
+	for _, mapped := range c.KindMap {
+		if mapped.KindName == kindName {
+			return mapped.FromKind
+		}
 	}
 	return kindName
 }
@@ -228,7 +230,7 @@ func (lang *JS) GenerateRules(args language.GenerateArgs) language.GenerateResul
 	generatedImports = append(generatedImports, generatedTSImports...)
 
 	existingRules := lang.readExistingRules(args, true)
-	lang.pruneManagedRules(existingRules, generatedRules)
+	lang.pruneManagedRules(args.Config, existingRules, generatedRules)
 
 	return language.GenerateResult{
 		Gen:     generatedRules,
@@ -362,7 +364,7 @@ func readFileAndParse(filePath string, rel string) (*imports, int) {
 func (lang *JS) genPkgRule(args language.GenerateArgs, jsConfig *JsConfig) *rule.Rule {
 	for _, baseName := range args.RegularFiles {
 		if baseName == "package.json" {
-			r := rule.NewRule(getKind(args.Config, "js_library"), "package_json")
+			r := rule.NewRule("js_library", "package_json")
 			r.SetAttr("srcs", []string{baseName})
 			if len(jsConfig.Visibility.Labels) > 0 {
 				r.SetAttr("visibility", jsConfig.Visibility.Labels)
@@ -386,7 +388,7 @@ func (lang *JS) genJestTest(args language.GenerateArgs, jsConfig *JsConfig, jest
 
 			ruleName := strings.TrimSuffix(baseName, extension) + ".test"
 			r := rule.NewRule(
-				getKind(args.Config, "jest_test"),
+				"jest_test",
 				ruleName,
 			)
 			r.SetAttr("srcs", []string{baseName})
@@ -421,7 +423,7 @@ func (lang *JS) genJestTest(args language.GenerateArgs, jsConfig *JsConfig, jest
 		pkgName := PkgName(args.Rel)
 		ruleName := fmt.Sprintf("%s_test", pkgName)
 		r := rule.NewRule(
-			getKind(args.Config, "jest_test"),
+			"jest_test",
 			ruleName,
 		)
 
@@ -492,7 +494,8 @@ func (lang *JS) genRules(args language.GenerateArgs, jsConfig *JsConfig, isBarre
 			// add as a folder
 			for _, existingRule := range lang.readExistingRules(args, false) {
 				// Look for existing rules with the same name, but different kind
-				if existingRule.Name() == name && existingRule.Kind() != getKind(args.Config, "ts_project") && existingRule.Kind() != getKind(args.Config, "js_library") {
+				existingKind := unmapKind(args.Config, existingRule.Kind())
+				if existingRule.Name() == name && existingKind != "ts_project" && existingKind != "js_library" {
 					if kind == "ts_project" {
 						name = name + "_ts"
 					} else {
@@ -504,7 +507,7 @@ func (lang *JS) genRules(args language.GenerateArgs, jsConfig *JsConfig, isBarre
 			folderImports, folderRule := lang.makeFolderRule(moduleRuleArgs{
 				pkgName:  name,
 				cwd:      args.Rel,
-				ruleType: getKind(args.Config, kind),
+				ruleType: kind,
 				srcs:     sources,
 				imports:  imports,
 			}, jsConfig)
@@ -522,7 +525,7 @@ func (lang *JS) genRules(args language.GenerateArgs, jsConfig *JsConfig, isBarre
 			moduleImports, moduleRules := lang.makeModuleRules(moduleRuleArgs{
 				pkgName:  name,
 				cwd:      args.Rel,
-				ruleType: getKind(args.Config, kind),
+				ruleType: kind,
 				srcs:     sources,
 				imports:  imports,
 			}, jsConfig)
@@ -542,7 +545,7 @@ func (lang *JS) genRules(args language.GenerateArgs, jsConfig *JsConfig, isBarre
 		} else {
 			// add as singletons
 			singletonRules := lang.makeRules(ruleArgs{
-				ruleType: getKind(args.Config, kind),
+				ruleType: kind,
 				srcs:     sources,
 				trimExt:  true,
 			}, jsConfig)
@@ -766,7 +769,7 @@ func (lang *JS) genWebAssets(args language.GenerateArgs, webAssetsSet map[string
 		if jsConfig.CollectWebAssets {
 			// aggregate rule
 			name := "assets"
-			r := rule.NewRule(getKind(args.Config, "web_assets"), name)
+			r := rule.NewRule("web_assets", name)
 			r.SetAttr("srcs", webAssets)
 			if len(jsConfig.Visibility.Labels) > 0 {
 				r.SetAttr("visibility", jsConfig.Visibility.Labels)
@@ -782,7 +785,7 @@ func (lang *JS) genWebAssets(args language.GenerateArgs, webAssetsSet map[string
 		} else {
 			// add as singletons
 			rules := lang.makeRules(ruleArgs{
-				ruleType: getKind(args.Config, "web_assets"),
+				ruleType: "web_assets",
 				srcs:     webAssets,
 				trimExt:  false, //shadow the original file name
 			}, jsConfig)
@@ -812,7 +815,7 @@ func (lang *JS) genAllAssets(args language.GenerateArgs, isJSRoot bool, jsConfig
 			JSRootDeps = append(JSRootDeps, fqName)
 		}
 		name := "all_assets"
-		r := rule.NewRule(getKind(args.Config, "web_assets"), name)
+		r := rule.NewRule("web_assets", name)
 		r.SetAttr("srcs", JSRootDeps)
 
 		generatedRules = append(generatedRules, r)
@@ -829,7 +832,7 @@ func (lang *JS) genCollectedTargetsRule(args language.GenerateArgs, jsConfig *Js
 	if jsConfig.CollectTargets != "" {
 
 		// Add an empty `js_library` rule. This will be given `deps` later in resolve.go
-		r := rule.NewRule(getKind(args.Config, "js_library"), jsConfig.CollectTargets)
+		r := rule.NewRule("js_library", jsConfig.CollectTargets)
 
 		if len(jsConfig.Visibility.Labels) > 0 {
 			r.SetAttr("visibility", jsConfig.Visibility.Labels)
@@ -849,7 +852,7 @@ func (lang *JS) readExistingRules(args language.GenerateArgs, managedOnly bool) 
 		// For each existing rule
 		for _, r := range BUILD.Rules {
 			if managedOnly {
-				if _, ok := managedRulesSet[r.Kind()]; !ok {
+				if _, ok := managedRulesSet[unmapKind(args.Config, r.Kind())]; !ok {
 					// skip unmanaged rules
 					continue
 				}
@@ -860,7 +863,7 @@ func (lang *JS) readExistingRules(args language.GenerateArgs, managedOnly bool) 
 	return existingRules
 }
 
-func (lang *JS) pruneManagedRules(existingRules map[string]*rule.Rule, generatedRules []*rule.Rule) {
+func (lang *JS) pruneManagedRules(c *config.Config, existingRules map[string]*rule.Rule, generatedRules []*rule.Rule) {
 	// Generate a list of rules that may be deleted and mark them for deletion
 	// This is generated from existing rules that are managed by gazelle
 	// that didn't get generated this run
@@ -869,19 +872,19 @@ func (lang *JS) pruneManagedRules(existingRules map[string]*rule.Rule, generated
 	deleteRulesSet := make(map[string]*rule.Rule)
 	for _, existingRule := range existingRules {
 		// use kind/name to enable deletion of old rules when a new rule would use the same name
-		key := fmt.Sprintf("%s/%s", existingRule.Kind(), existingRule.Name())
+		key := fmt.Sprintf("%s/%s", unmapKind(c, existingRule.Kind()), existingRule.Name())
 		deleteRulesSet[key] = existingRule
 	}
 
 	// Prune generated rules
 	for _, generatedRule := range generatedRules {
-		key := fmt.Sprintf("%s/%s", generatedRule.Kind(), generatedRule.Name())
+		key := fmt.Sprintf("%s/%s", unmapKind(c, generatedRule.Kind()), generatedRule.Name())
 		delete(deleteRulesSet, key)
 	}
 
 	for _, r := range deleteRulesSet {
 		// Is this rule managed by Gazelle?
-		if _, ok := managedRulesSet[r.Kind()]; ok {
+		if _, ok := managedRulesSet[unmapKind(c, r.Kind())]; ok {
 			// It is managed, and wasn't generated, so delete it
 			r.Delete()
 		}

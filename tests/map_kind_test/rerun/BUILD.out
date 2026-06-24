@@ -1,0 +1,12 @@
+load("//build:vitest_test.bzl", "vitest_test")
+
+vitest_test(
+    name = "bar.test",
+    srcs = ["bar.test.ts"],
+    config = "//:jest.config",
+    data = [
+        "//:node_modules/lodash",
+        "//:package_json",
+    ],
+    deps = ["//:node_modules/lodash"],
+)
