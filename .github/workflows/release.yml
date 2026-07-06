@@ -25,7 +25,9 @@ jobs:
             - name: bazel test //...
               run: bazel test //...
             - name: Prepare Release
-              run: .github/workflows/workspace_snippet.sh ${{ env.GITHUB_REF_NAME }} > release_notes.txt
+              env:
+                  GITHUB_REF_NAME: ${{ github.ref_name }}
+              run: .github/workflows/workspace_snippet.sh "$GITHUB_REF_NAME" > release_notes.txt
             - name: Release
               uses: benchsci/action-gh-release@v1
               with:
