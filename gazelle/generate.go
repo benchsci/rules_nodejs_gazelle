@@ -84,15 +84,24 @@ func (lang *JS) Loads() []rule.LoadInfo {
 	}
 }
 
-// unmapKind returns the builtin kind for a rule kind that may have been
-// renamed on disk via a "# gazelle:map_kind" directive.
+// unmapKind reverses "# gazelle:map_kind" renames to recover the builtin kind
+// of a rule read from disk, following chains (identity if unmapped).
 func unmapKind(c *config.Config, kindName string) string {
-	for _, mapped := range c.KindMap {
-		if mapped.KindName == kindName {
-			return mapped.FromKind
+	seen := map[string]bool{kindName: true}
+	for {
+		from := ""
+		for _, mapped := range c.KindMap {
+			if mapped.KindName == kindName {
+				from = mapped.FromKind
+				break
+			}
 		}
+		if from == "" || seen[from] {
+			return kindName
+		}
+		seen[from] = true
+		kindName = from
 	}
-	return kindName
 }
 
 // GenerateRules extracts build metadata from source files in a directory.
