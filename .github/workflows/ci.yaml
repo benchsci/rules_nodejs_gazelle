@@ -15,6 +15,9 @@ jobs:
             matrix:
                 os: [ubuntu-latest, macos-latest]
                 bazel_version: ['6.5.0', '7.6.1', '8.4.0']
+                exclude:
+                    - os: macos-latest
+                      bazel_version: '6.5.0'
         steps:
             - name: Checkout
               uses: actions/checkout@v4
