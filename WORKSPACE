@@ -35,6 +35,15 @@ http_archive(
     ],
 )
 
+http_archive(
+    name = "rules_shell",
+    sha256 = "bc61ef94facc78e20a645726f64756e5e285a045037c7a61f65af2941f4c25e1",
+    strip_prefix = "rules_shell-0.4.1",
+    urls = [
+        "https://github.com/bazel-contrib/rules_shell/releases/download/v0.4.1/rules_shell-v0.4.1.tar.gz",
+    ],
+)
+
 load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies")
 

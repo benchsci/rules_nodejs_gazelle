@@ -1,4 +1,5 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
 
 # Copyright 2019 The Bazel Authors. All rights reserved.
 # Modifications copyright (C) 2021 BenchSci Analytics Inc.
