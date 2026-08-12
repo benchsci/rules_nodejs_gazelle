@@ -1,0 +1,5 @@
+# gazelle:js_root
+# gazelle:js_package_file package.json :node_modules
+# gazelle:js_jest_config :jest.config
+
+# gazelle:map_kind jest_test vitest_test //build:vitest_test.bzl

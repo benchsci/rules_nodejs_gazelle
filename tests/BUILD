@@ -60,6 +60,7 @@ go_binary(
         "jest_mock",
         "jsx_conversion",
         "lookup_types",
+        "map_kind_test",
         "module_self_import",
         "react_example",
         "simple_barrel",

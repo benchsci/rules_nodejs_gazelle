@@ -1,0 +1,24 @@
+load("@aspect_rules_js//js:defs.bzl", "js_library")
+load("//build:vitest_test.bzl", "vitest_test")
+
+# gazelle:js_root
+# gazelle:js_package_file package.json :node_modules
+# gazelle:js_jest_config :jest.config
+
+# gazelle:map_kind jest_test vitest_test //build:vitest_test.bzl
+
+js_library(
+    name = "package_json",
+    srcs = ["package.json"],
+)
+
+vitest_test(
+    name = "foo.test",
+    srcs = ["foo.test.ts"],
+    config = "//:jest.config",
+    data = [
+        "//:node_modules/lodash",
+        "//:package_json",
+    ],
+    deps = ["//:node_modules/lodash"],
+)

@@ -112,7 +112,7 @@ func (lang *JS) Imports(c *config.Config, r *rule.Rule, f *rule.File) []resolve.
 	}
 
 	// modules can be resolved via the directory containing them
-	if (isBarrel || jsConfig.CollectAll) && r.Kind() != getKind(c, "jest_test") {
+	if (isBarrel || jsConfig.CollectAll) && r.Kind() != "jest_test" {
 		importSpecs = append(importSpecs, resolve.ImportSpec{
 			Lang: lang.Name(),
 			Imp:  f.Pkg,
@@ -120,7 +120,7 @@ func (lang *JS) Imports(c *config.Config, r *rule.Rule, f *rule.File) []resolve.
 	}
 
 	// Any subfolders could be used to depend on this rule
-	folderImports := jsConfig.CollectAll && (r.Kind() == getKind(c, "ts_project") || r.Kind() == getKind(c, "js_library"))
+	folderImports := jsConfig.CollectAll && (r.Kind() == "ts_project" || r.Kind() == "js_library")
 	if folderImports {
 		base := filepath.Dir(f.Path)
 		subDirectories := make(map[string]bool)
@@ -256,7 +256,7 @@ func (lang *JS) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Remote
 	}
 
 	// Add in additional jest dependencies
-	if r.Kind() == getKind(c, "jest_test") {
+	if r.Kind() == "jest_test" {
 		// All deps are also data for jest_test rules.
 		for name := range depSet {
 			dataSet[name] = true
