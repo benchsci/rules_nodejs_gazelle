@@ -10,17 +10,12 @@ on:
                 type: string
                 description: 'The release tag to publish (e.g. v0.9.0)'
 
-permissions:
-    contents: write
-    id-token: write
-    attestations: write
-
 jobs:
     publish:
         uses: bazel-contrib/publish-to-bcr/.github/workflows/publish.yaml@v1.5.0
         with:
             tag_name: ${{ inputs.tag_name || github.event.release.tag_name }}
             registry_fork: benchsci/bazel-central-registry
-            attest: true
+            attest: false
         secrets:
             publish_token: ${{ secrets.BCR_PUBLISH_TOKEN }}
